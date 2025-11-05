@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
-import { ChatMessage, MessageRole, Ingredient, UserProfile, DailySummaryEntry, FavoriteFood } from './types';
+import { ChatMessage, MessageRole, Ingredient, UserProfile, DailySummaryEntry, Activity } from './types';
 import ChatInput from './components/ChatInput';
 import ChatMessageBubble from './components/ChatMessage';
 import Greeting from './components/Greeting';
@@ -8,23 +8,24 @@ import { UserIcon, CalendarIcon, ChartBarIcon } from './components/Icons';
 import DuplicateWarningModal from './components/DuplicateWarningModal';
 import ProfilePage from './components/ProfilePage';
 import DailySummaryHistory from './components/DailySummaryHistory';
-import ExerciseLogger from './components/ExerciseLogger';
 import Reports from './components/Reports';
-import FavoriteFoods from './components/FavoriteFoods';
 import ThemeToggle from './components/ThemeToggle';
+import HeyCoach from './components/HeyCoach';
+import DietAnalysis from './components/DietAnalysis';
+import FastingTracker from './components/FastingTracker';
+import WhatIfFood from './components/WhatIfFood';
 
 const BASE_SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
 
-When the user describes a meal, your response must begin with a JSON object with a nutritional breakdown. This JSON object must be inside a \`\`\`json code block. This JSON + conversational feedback format should be used whenever a meal is described, not just for the first message.
+The user can log either meals or exercises. Your response MUST begin with a JSON object in a \`\`\`json code block based on the user's input.
 
+**1. For MEAL LOGS:**
 The JSON structure is an array of objects, each with keys: "ingredient", "calories", "protein", "fat", "notes", and "isHealthy".
-The "isHealthy" key must be a boolean value (true for healthy, false for unhealthy).
-
-- For healthy foods, the 'notes' should be positive and informative.
-- For unhealthy foods, the 'notes' should be a single, witty, sarcastic one-liner.
-- **CRITICAL**: If a food item conflicts with the user's health conditions (e.g., high sugar for diabetics, high sodium for hypertension), mark it as "isHealthy": false and include a specific health warning in the notes.
-
-Example JSON for a user with diabetes:
+The "isHealthy" key must be a boolean.
+- For healthy foods, 'notes' should be positive.
+- For unhealthy foods, 'notes' should be a witty, sarcastic one-liner.
+- **CRITICAL**: If a food conflicts with user's health conditions, mark "isHealthy": false and add a specific warning in 'notes'.
+Example JSON for a meal:
 \`\`\`json
 [
   {
@@ -37,43 +38,77 @@ Example JSON for a user with diabetes:
   }
 ]
 \`\`\`
+Following the JSON, provide conversational feedback in Markdown (max 4-5 lines).
 
-Following the JSON block, provide conversational feedback in Markdown.
-- If the meal is generally healthy, be encouraging.
-- **If any food items conflict with the user's health conditions, provide a specific warning as the first line of your feedback.** (e.g., "⚠️ Warning: This meal contains high sugar which may affect your diabetes. Consider switching to...")
-- If the meal contains unhealthy items (without a specific health warning), provide a concise suggestion for improvement (no more than 2 lines).
-- Keep all conversational feedback brief, within a 4-5 line maximum.
+**2. For EXERCISE LOGS:**
+If the user describes a physical activity, the JSON structure is an array of objects with keys: "activity", "duration", "caloriesBurned", "notes", and "emoji".
+- "duration" is in minutes.
+- "emoji" must be a single, relevant emoji for the activity.
+- If the user provides calories burned, use that value.
+- If not, you MUST estimate "caloriesBurned" based on the activity, duration, and the user's profile (provided below).
+- If crucial information like duration is missing, you may ask one clarifying question. Otherwise, make a reasonable estimate.
+- 'notes' should be a short, encouraging comment about the activity.
+Example JSON for an exercise:
+\`\`\`json
+[
+  {
+    "activity": "Running",
+    "duration": 30,
+    "caloriesBurned": 350,
+    "notes": "Great job on the run! That's a solid calorie burn.",
+    "emoji": "🏃"
+  }
+]
+\`\`\`
+Following the JSON, provide a brief, encouraging comment in Markdown.
 
-Do not provide medical advice. Just your expert nutritional judgment with health-aware guidance.`;
+Always prioritize identifying the input as either a meal or an exercise and use the correct JSON format. Do not combine them. Do not provide medical advice.`;
 
 const USER_PROFILE_KEY = 'gemini-food-copilot-user-profile';
-const FAVORITE_FOODS_KEY = 'gemini-food-copilot-favorite-foods';
 const DAILY_SUMMARIES_KEY = 'gemini-food-copilot-daily-summaries';
 
 const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
-const parseNutritionResponse = (text: string): { nutritionData?: Ingredient[]; remainingText: string } => {
+const parseModelResponse = (text: string): { nutritionData?: Ingredient[]; activityData?: Activity[]; remainingText: string } => {
     const jsonRegex = /```json\n([\s\S]*?)\n```/;
     const match = text.match(jsonRegex);
 
     if (match && match[1]) {
         try {
             const jsonData = JSON.parse(match[1]);
-            const normalizedData = jsonData.map((item: any) => ({
-                ...item,
-                calories: Number(item.calories) || 0,
-                protein: Number(item.protein) || 0,
-                fat: Number(item.fat) || 0,
-            }));
             const remainingText = text.replace(jsonRegex, '').trim();
-            return { nutritionData: normalizedData, remainingText };
+
+            if (Array.isArray(jsonData) && jsonData.length > 0) {
+                // Check if it's a nutrition log
+                if ('ingredient' in jsonData[0] && 'calories' in jsonData[0]) {
+                    const normalizedData = jsonData.map((item: any) => ({
+                        ...item,
+                        calories: Number(item.calories) || 0,
+                        protein: Number(item.protein) || 0,
+                        fat: Number(item.fat) || 0,
+                    }));
+                    return { nutritionData: normalizedData, remainingText };
+                }
+                // Check if it's an activity log
+                if ('activity' in jsonData[0] && 'caloriesBurned' in jsonData[0]) {
+                    const normalizedData = jsonData.map((item: any) => ({
+                        ...item,
+                        duration: Number(item.duration) || 0,
+                        caloriesBurned: Number(item.caloriesBurned) || 0,
+                        emoji: item.emoji || '💪',
+                    }));
+                    return { activityData: normalizedData, remainingText };
+                }
+            }
+            return { remainingText: text };
+
         } catch (error) {
-            console.error("Failed to parse nutrition JSON:", error);
-            return { nutritionData: undefined, remainingText: text };
+            console.error("Failed to parse model JSON:", error);
+            return { remainingText: text };
         }
     }
 
-    return { nutritionData: undefined, remainingText: text };
+    return { remainingText: text };
 };
 
 const calculateSimilarity = (str1: string, str2: string): number => {
@@ -119,9 +154,14 @@ const App: React.FC = () => {
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isExerciseOpen, setIsExerciseOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
   
+  const [isHeyCoachOpen, setIsHeyCoachOpen] = useState(false);
+  const [isDietAnalysisOpen, setIsDietAnalysisOpen] = useState(false);
+  const [isFastingTrackerOpen, setIsFastingTrackerOpen] = useState(false);
+  const [isWhatIfFoodOpen, setIsWhatIfFoodOpen] = useState(false);
+  const [allDailySummaries, setAllDailySummaries] = useState<DailySummaryEntry[]>([]);
+
   const [duplicateWarning, setDuplicateWarning] = useState<{
     show: boolean;
     content: string;
@@ -143,8 +183,12 @@ const App: React.FC = () => {
       } else {
         setIsProfileOpen(true);
       }
+      const summariesJson = localStorage.getItem(DAILY_SUMMARIES_KEY);
+      if (summariesJson) {
+        setAllDailySummaries(JSON.parse(summariesJson));
+      }
     } catch (error) {
-      console.error("Could not load profile from localStorage:", error);
+      console.error("Could not load data from localStorage:", error);
     }
   }, []);
 
@@ -163,24 +207,35 @@ const App: React.FC = () => {
     if (!userProfile) return;
 
     const today = new Date().toISOString().split('T')[0];
-    const todayMessages = messages.filter(m => m.timestamp.startsWith(today) && m.role === MessageRole.MODEL && m.nutritionData);
+    const todayMessages = messages.filter(m => m.timestamp.startsWith(today) && m.role === MessageRole.MODEL);
 
-    let totalCalories = 0, totalProtein = 0, totalFat = 0;
+    let totalCalories = 0, totalProtein = 0, totalFat = 0, totalCaloriesBurned = 0, totalMinutesActive = 0;
+    let mealsLogged = 0;
+    
     todayMessages.forEach(msg => {
-      msg.nutritionData?.forEach(item => {
-        totalCalories += Number(item.calories) || 0;
-        totalProtein += Number(item.protein) || 0;
-        totalFat += Number(item.fat) || 0;
-      });
+      if(msg.nutritionData) {
+        mealsLogged++;
+        msg.nutritionData.forEach(item => {
+          totalCalories += Number(item.calories) || 0;
+          totalProtein += Number(item.protein) || 0;
+          totalFat += Number(item.fat) || 0;
+        });
+      }
+      if(msg.activityData) {
+        msg.activityData.forEach(item => {
+          totalCaloriesBurned += Number(item.caloriesBurned) || 0;
+          totalMinutesActive += Number(item.duration) || 0;
+        });
+      }
     });
 
     const summary: DailySummaryEntry = {
       date: today,
-      totals: { calories: Math.round(totalCalories), protein: Math.round(totalProtein), fat: Math.round(totalFat) },
+      totals: { calories: Math.round(totalCalories), protein: Math.round(totalProtein), fat: Math.round(totalFat), totalCaloriesBurned: Math.round(totalCaloriesBurned), totalMinutesActive: Math.round(totalMinutesActive) },
       targets: userProfile.dailyTargets,
-      mealsLogged: todayMessages.length,
+      mealsLogged: mealsLogged,
       goalsMet: {
-        calories: totalCalories <= userProfile.dailyTargets.calories * 1.1,
+        calories: (totalCalories - totalCaloriesBurned) <= userProfile.dailyTargets.calories * 1.1,
         protein: totalProtein >= userProfile.dailyTargets.protein * 0.9,
         fat: totalFat <= userProfile.dailyTargets.fat * 1.1,
       },
@@ -195,6 +250,7 @@ const App: React.FC = () => {
       summaries.push(summary);
     }
     localStorage.setItem(DAILY_SUMMARIES_KEY, JSON.stringify(summaries));
+    setAllDailySummaries(summaries);
   }, [messages, userProfile]);
 
   useEffect(() => {
@@ -204,10 +260,11 @@ const App: React.FC = () => {
   const getEnhancedSystemInstruction = useCallback(() => {
     if (!userProfile) return BASE_SYSTEM_INSTRUCTION;
     let instruction = BASE_SYSTEM_INSTRUCTION;
+    instruction += `\n\nUSER PROFILE: Age: ${userProfile.age}, Gender: ${userProfile.gender}, Weight: ${userProfile.weight}kg.`;
     if (userProfile.healthConditions.length > 0) {
-      instruction += `\n\nUSER HEALTH CONDITIONS: ${userProfile.healthConditions.join(', ')}.`;
+      instruction += ` Health Conditions: ${userProfile.healthConditions.join(', ')}.`;
     }
-    instruction += `\n\nUSER DAILY TARGETS: ${userProfile.dailyTargets.calories} calories, ${userProfile.dailyTargets.protein}g protein, ${userProfile.dailyTargets.fat}g fat.`;
+    instruction += ` Daily Targets: ${userProfile.dailyTargets.calories} calories, ${userProfile.dailyTargets.protein}g protein, ${userProfile.dailyTargets.fat}g fat.`;
     return instruction;
   }, [userProfile]);
 
@@ -227,7 +284,7 @@ const App: React.FC = () => {
     initializeChat();
   }, [userProfile, getEnhancedSystemInstruction]);
   
-  const streamModelResponse = async (message: string, onChunk: (text: string) => void, onComplete: (nutritionData?: Ingredient[], remainingText?: string) => void) => {
+  const streamModelResponse = async (message: string, onChunk: (text: string) => void, onComplete: (data: { nutritionData?: Ingredient[], activityData?: Activity[], remainingText?: string }) => void) => {
     if (!chatSessionRef.current) throw new Error("Chat session not initialized.");
     const stream = await chatSessionRef.current.sendMessageStream({ message });
     let modelResponse = '';
@@ -235,8 +292,8 @@ const App: React.FC = () => {
       modelResponse += chunk.text;
       onChunk(modelResponse);
     }
-    const { nutritionData, remainingText } = parseNutritionResponse(modelResponse);
-    onComplete(nutritionData, remainingText);
+    const { nutritionData, activityData, remainingText } = parseModelResponse(modelResponse);
+    onComplete({ nutritionData, activityData, remainingText });
   };
   
   const handleSendMessageInternal = async (userInput: string, imageUrl?: string) => {
@@ -251,7 +308,7 @@ const App: React.FC = () => {
       await streamModelResponse(
         userInput,
         (modelResponse) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m)),
-        (nutritionData, remainingText) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m))
+        ({ nutritionData, activityData, remainingText }) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData, activityData } : m))
       );
     } catch (e) {
       setError(`Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
@@ -297,25 +354,21 @@ const App: React.FC = () => {
     setError(null);
     const imageUrl = URL.createObjectURL(file);
     const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: "Analyzing image...", imageUrl, timestamp: new Date().toISOString() };
-    const modelMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.MODEL, content: '', timestamp: new Date().toISOString() };
-    setMessages(prev => [...prev, userMessage, modelMessage]);
+    setMessages(prev => [...prev, userMessage]);
 
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const imagePart = { inlineData: { data: await new Promise<string>(r => {const reader = new FileReader(); reader.onloadend = () => r((reader.result as string).split(',')[1]); reader.readAsDataURL(file);}), mimeType: file.type }};
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: { parts: [ { text: "Describe the food items in this image for a nutrition log. Be descriptive and concise." }, imagePart ] } });
         const foodDescription = response.text;
-        setMessages(prev => prev.map(msg => msg.id === userMessage.id ? { ...msg, content: foodDescription } : msg));
         
-        await streamModelResponse(
-          foodDescription,
-          (modelResponse) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m)),
-          (nutritionData, remainingText) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m))
-        );
+        // Update the user message with the description, then send it for analysis
+        setMessages(prev => prev.map(msg => msg.id === userMessage.id ? { ...msg, content: foodDescription } : msg));
+        await handleSendMessageInternal(foodDescription, imageUrl);
+
     } catch (e) {
         setError(`Image analysis failed: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
-        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id && msg.id !== modelMessage.id));
-    } finally {
+        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
         setLoadingState({ type: 'idle' });
     }
   };
@@ -337,39 +390,20 @@ const App: React.FC = () => {
 
     const updatedMessages = [...originalMessages];
     updatedMessages[userMessageIndex] = { ...updatedMessages[userMessageIndex], content: newContent, timestamp: new Date().toISOString() };
-    updatedMessages[userMessageIndex + 1] = { ...modelMessage, content: '', nutritionData: undefined };
+    updatedMessages[userMessageIndex + 1] = { ...modelMessage, content: '', nutritionData: undefined, activityData: undefined };
     setMessages(updatedMessages);
 
     try {
       await streamModelResponse(
         newContent,
         (modelResponse) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m)),
-        (nutritionData, remainingText) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m))
+        ({ nutritionData, activityData, remainingText }) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData, activityData } : m))
       );
     } catch (e) {
         setError(`Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
         setMessages(originalMessages);
     } finally {
         setLoadingState({ type: 'idle' });
-    }
-  }, []);
-
-  const handleSaveMealAsFavorite = useCallback((mealContent: string) => {
-    const defaultName = mealContent.length > 25 ? `${mealContent.substring(0, 25)}...` : mealContent;
-    const mealName = prompt("Enter a name for this favorite meal:", defaultName);
-    if (mealName) {
-        const saved = localStorage.getItem(FAVORITE_FOODS_KEY);
-        const favorites: FavoriteFood[] = saved ? JSON.parse(saved) : [];
-        const existingIndex = favorites.findIndex(f => f.name.toLowerCase() === mealName.trim().toLowerCase());
-
-        if (existingIndex >= 0) {
-            if (!confirm(`A favorite named "${mealName.trim()}" already exists. Overwrite it?`)) return;
-            favorites[existingIndex] = { ...favorites[existingIndex], content: mealContent };
-        } else {
-            favorites.push({ name: mealName.trim(), content: mealContent, useCount: 1, lastUsed: new Date().toISOString() });
-        }
-        localStorage.setItem(FAVORITE_FOODS_KEY, JSON.stringify(favorites));
-        alert(`"${mealName.trim()}" saved to favorites!`);
     }
   }, []);
 
@@ -398,13 +432,12 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-transparent text-zinc-200 font-sans">
-      <header className="bg-black/30 backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-[var(--glass-border)]">
+      <header className="bg-[var(--glass-bg)] backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-[var(--glass-border)]">
         <h1 className="text-xl font-medium text-[var(--text-primary)]">SukeshFIT</h1>
         <div className="flex items-center gap-1 sm:gap-2">
-            <button onClick={() => setIsExerciseOpen(true)} title="Log Exercise" className="p-2 text-zinc-400 hover:text-orange-400 transition-colors"><span className="text-xl">🏃</span></button>
-            <button onClick={() => setIsHistoryOpen(true)} title="Daily History" className="p-2 text-zinc-400 hover:text-indigo-400 transition-colors"><CalendarIcon className="w-6 h-6"/></button>
-            <button onClick={() => setIsReportsOpen(true)} title="Weekly/Monthly Reports" className="p-2 text-zinc-400 hover:text-purple-400 transition-colors"><ChartBarIcon className="w-6 h-6"/></button>
-            <button onClick={() => setIsProfileOpen(true)} title="Profile" className="p-2 text-zinc-400 hover:text-blue-400 transition-colors"><UserIcon className="w-6 h-6"/></button>
+            <button onClick={() => setIsHistoryOpen(true)} title="Daily History" className="p-2 text-[var(--icon-color)] hover:text-pink-500 transition-colors"><CalendarIcon className="w-6 h-6"/></button>
+            <button onClick={() => setIsReportsOpen(true)} title="Weekly/Monthly Reports" className="p-2 text-[var(--icon-color)] hover:text-rose-500 transition-colors"><ChartBarIcon className="w-6 h-6"/></button>
+            <button onClick={() => setIsProfileOpen(true)} title="Profile" className="p-2 text-[var(--icon-color)] hover:text-fuchsia-500 transition-colors"><UserIcon className="w-6 h-6"/></button>
             <ThemeToggle />
         </div>
       </header>
@@ -412,7 +445,12 @@ const App: React.FC = () => {
       <main className="flex-1 overflow-y-auto px-4 md:px-6">
         <div className="max-w-4xl mx-auto w-full h-full">
           {messages.length === 0 ? (
-            <Greeting onSuggestionClick={(prompt) => handleSendMessage(prompt)} />
+            <Greeting
+              onOpenHeyCoach={() => setIsHeyCoachOpen(true)}
+              onOpenDietAnalysis={() => setIsDietAnalysisOpen(true)}
+              onOpenFastingTracker={() => setIsFastingTrackerOpen(true)}
+              onOpenWhatIfFood={() => setIsWhatIfFoodOpen(true)}
+            />
           ) : (
             <>
             {groupedMessages.map(([date, messagesForDay]) => (
@@ -423,16 +461,17 @@ const App: React.FC = () => {
                     {messagesForDay.map((msg) => {
                         const globalIndex = messages.findIndex(m => m.id === msg.id);
                         const isMealLog = msg.role === MessageRole.USER && globalIndex + 1 < messages.length && messages[globalIndex + 1].role === MessageRole.MODEL && !!messages[globalIndex + 1].nutritionData;
-                        
+                        const isAnalyzedLogMessage = msg.role === MessageRole.MODEL && ((!!msg.nutritionData && msg.nutritionData.length > 0) || (!!msg.activityData && msg.activityData.length > 0));
+
                         return (
                           <div key={msg.id} className={`flex w-full ${msg.role === MessageRole.USER ? 'justify-end' : 'justify-start'}`}>
                               <ChatMessageBubble
-                                  message={msg} isMealLog={isMealLog} onSaveMeal={handleSaveMealAsFavorite}
+                                  message={msg} isMealLog={isMealLog}
                                   isEditing={editingMessageId === msg.id} onStartEdit={setEditingMessageId}
                                   onCancelEdit={() => setEditingMessageId(null)} onEditMessage={handleEditMessage}
                                   isProcessing={loadingState.type !== 'idle'}
                                   isCurrentlySavingEdit={loadingState.type === 'editing' && loadingState.id === msg.id}
-                                  isAnalyzedModelMessage={msg.role === MessageRole.MODEL && !!msg.nutritionData && msg.nutritionData.length > 0}
+                                  isAnalyzedLogMessage={isAnalyzedLogMessage}
                                   messagesForSummary={messages} dailyTargets={userProfile?.dailyTargets}
                               />
                           </div>
@@ -446,10 +485,9 @@ const App: React.FC = () => {
         </div>
       </main>
     
-      <footer className="w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[var(--bg-gradient-to)] via-[var(--bg-gradient-to)]/90 to-transparent">
-        <div className="max-w-4xl mx-auto">
+      <footer className="w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[var(--bg-gradient-to)] via-[var(--bg-gradient-to)]/95 to-transparent pt-4">
+        <div className="max-w-4xl mx-auto w-full">
             {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-lg text-sm mb-2 text-center">{error}</div>}
-            <FavoriteFoods onSelectFood={(content) => handleSendMessage(content)} />
             <ChatInput
                 onSendMessage={handleSendMessage}
                 isSending={loadingState.type === 'sending'}
@@ -460,10 +498,14 @@ const App: React.FC = () => {
       </footer>
 
       <DailySummaryHistory isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
-      <ExerciseLogger isOpen={isExerciseOpen} onClose={() => setIsExerciseOpen(false)} />
       <Reports isOpen={isReportsOpen} onClose={() => setIsReportsOpen(false)} />
       <DuplicateWarningModal isOpen={duplicateWarning.show} duplicateContent={duplicateWarning.content} minutesAgo={duplicateWarning.minutesAgo} onConfirm={handleConfirmDuplicate} onCancel={handleCancelDuplicate} />
       {isProfileOpen && <ProfilePage userProfile={userProfile} onSave={handleSaveProfile} onClose={() => setIsProfileOpen(false)} />}
+      
+      {isHeyCoachOpen && <HeyCoach isOpen={isHeyCoachOpen} onClose={() => setIsHeyCoachOpen(false)} userProfile={userProfile} dailySummaries={allDailySummaries} />}
+      {isDietAnalysisOpen && <DietAnalysis isOpen={isDietAnalysisOpen} onClose={() => setIsDietAnalysisOpen(false)} userProfile={userProfile} allDailySummaries={allDailySummaries} />}
+      {isFastingTrackerOpen && <FastingTracker isOpen={isFastingTrackerOpen} onClose={() => setIsFastingTrackerOpen(false)} />}
+      {isWhatIfFoodOpen && <WhatIfFood isOpen={isWhatIfFoodOpen} onClose={() => setIsWhatIfFoodOpen(false)} userProfile={userProfile} dailySummaries={allDailySummaries} />}
     </div>
   );
 };

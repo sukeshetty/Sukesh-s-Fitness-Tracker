@@ -12,20 +12,26 @@
         --bg-gradient-to: #0c0c0e;
         --text-primary: #e4e4e7;
         --text-secondary: #a1a1aa;
-        --glass-bg: rgba(0, 0, 0, 0.3);
+        --glass-bg: rgba(28, 28, 30, 0.5);
         --glass-border: rgba(255, 255, 255, 0.1);
         --component-bg: rgba(255, 255, 255, 0.05);
+        --card-shadow: none;
+        --modal-overlay-bg: rgba(12, 12, 14, 0.7);
+        --icon-color: #a1a1aa; /* zinc-400 */
       }
 
       :root[data-theme="light"] {
-        --bg-gradient-from: #e0e7ff;
-        --bg-gradient-via: #ffffff;
-        --bg-gradient-to: #f0f9ff;
-        --text-primary: #18181b;
-        --text-secondary: #52525b;
-        --glass-bg: rgba(255, 255, 255, 0.5);
-        --glass-border: rgba(0, 0, 0, 0.1);
-        --component-bg: rgba(0, 0, 0, 0.03);
+        --bg-gradient-from: #fdf2f8; /* pink-50 */
+        --bg-gradient-via: #fff1f2; /* rose-50 */
+        --bg-gradient-to: #ffe4e6; /* rose-100 */
+        --text-primary: #4c0519; /* rose-950 */
+        --text-secondary: #831843; /* pink-900 */
+        --glass-bg: rgba(253, 242, 248, 0.8); /* pink-50 with alpha */
+        --glass-border: #fecdd3; /* rose-200 */
+        --component-bg: #fff1f2; /* rose-50 */
+        --card-shadow: 0 4px 12px rgba(131, 24, 67, 0.08);
+        --modal-overlay-bg: rgba(253, 242, 248, 0.6); /* pink-50 with alpha */
+        --icon-color: #be185d; /* pink-700 */
       }
 
       body {
@@ -33,6 +39,18 @@
         color: var(--text-primary);
         transition: background 0.3s ease, color 0.3s ease;
       }
+
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+
+      .animate-slideUp { animation: slideUp 0.2s ease-out; }
+
+      .scrollbar-thin::-webkit-scrollbar { width: 6px; }
+      .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+      .scrollbar-thin::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: #52525b; }
     </style>
     <script type="importmap">
       {

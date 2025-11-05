@@ -2,27 +2,50 @@ import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { ChatMessage, MessageRole, DailyTargets } from '../types';
-import { UserIcon, GeminiStarIcon, BookmarkIcon, EditIcon } from './Icons';
+import { UserIcon, GeminiStarIcon, EditIcon } from './Icons';
 import NutritionCard from './NutritionCard';
 import TotalNutritionCard from './TotalNutritionCard';
 import Spinner from './Spinner';
 import DailySummaryCard from './DailySummaryCard';
 import TTSButton from './TTSButton';
+import TotalActivityCard from './TotalActivityCard';
 
 interface ChatMessageProps {
   message: ChatMessage;
   isMealLog: boolean;
-  onSaveMeal: (content: string) => void;
   isEditing: boolean;
   onStartEdit: (messageId: string) => void;
   onCancelEdit: () => void;
   onEditMessage: (messageId: string, newContent: string) => void;
   isProcessing: boolean; // Is any request in flight?
   isCurrentlySavingEdit: boolean; // Is this specific message's edit being saved?
-  isAnalyzedModelMessage: boolean;
+  isAnalyzedLogMessage: boolean;
   messagesForSummary: ChatMessage[];
   dailyTargets?: DailyTargets;
 }
+
+const LoadingIndicator: React.FC = () => {
+    const loadingTexts = ["Thinking...", "Analyzing your input...", "Assessing your details..."];
+    const [text, setText] = useState(loadingTexts[0]);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setText(currentText => {
+                const currentIndex = loadingTexts.indexOf(currentText);
+                const nextIndex = (currentIndex + 1) % loadingTexts.length;
+                return loadingTexts[nextIndex];
+            });
+        }, 1800);
+        return () => clearInterval(interval);
+    }, []);
+
+    return (
+        <div className="flex items-center text-zinc-400">
+            <span>{text}</span>
+            <span className="inline-block w-2 h-5 bg-zinc-400 animate-pulse ml-2"></span>
+        </div>
+    );
+};
 
 const InlineEditForm: React.FC<{
     initialContent: string;
@@ -86,18 +109,14 @@ const InlineEditForm: React.FC<{
 };
 
 
-const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onSaveMeal, isEditing, onStartEdit, onCancelEdit, onEditMessage, isProcessing, isCurrentlySavingEdit, isAnalyzedModelMessage, messagesForSummary, dailyTargets }) => {
+const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, isEditing, onStartEdit, onCancelEdit, onEditMessage, isProcessing, isCurrentlySavingEdit, isAnalyzedLogMessage, messagesForSummary, dailyTargets }) => {
   const isUser = message.role === MessageRole.USER;
 
   const rawMarkup = marked.parse(message.content, { breaks: true, gfm: true });
   const sanitizedMarkup = DOMPurify.sanitize(rawMarkup as string);
 
-  const isLoading = message.role === MessageRole.MODEL && !message.content && !message.nutritionData;
+  const isLoading = message.role === MessageRole.MODEL && !message.content && !message.nutritionData && !message.activityData;
   
-  const BlinkingCursor = () => (
-    <span className="inline-block w-2 h-5 bg-zinc-400 animate-pulse ml-1"></span>
-  );
-
   return (
     <div className={`group flex items-start gap-4 my-6 w-full ${isUser ? 'max-w-2xl flex-row-reverse' : 'max-w-4xl'}`}>
       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center self-start">
@@ -130,6 +149,12 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
                         </div>
                     </div>
                 )}
+
+                {!isUser && message.activityData && message.activityData.length > 0 && (
+                    <div className="w-full my-2">
+                        <TotalActivityCard data={message.activityData} timestamp={message.timestamp} />
+                    </div>
+                )}
                 
                 {message.content ? (
                     <div className="flex items-center gap-2 w-full">
@@ -141,7 +166,7 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
                     </div>
                 ) : null}
 
-                {isAnalyzedModelMessage && (
+                {isAnalyzedLogMessage && (
                     <div className="w-full mt-4">
                         <DailySummaryCard 
                           messages={messagesForSummary.filter(m => new Date(m.timestamp) <= new Date(message.timestamp))}
@@ -150,11 +175,7 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
                     </div>
                 )}
 
-                {isLoading && (
-                    <div className="flex items-center text-[var(--text-secondary)]">
-                        <BlinkingCursor />
-                    </div>
-                )}
+                {isLoading && <LoadingIndicator />}
             </>
         )}
       </div>
@@ -169,15 +190,6 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
                     disabled={isProcessing}
                     >
                     <EditIcon className="w-4 h-4" />
-                </button>
-                <button
-                    onClick={() => onSaveMeal(message.content)}
-                    className="text-zinc-400 hover:text-zinc-100 p-2 rounded-full hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Save meal as favorite"
-                    aria-label="Save meal as favorite"
-                    disabled={isProcessing}
-                    >
-                    <BookmarkIcon className="w-4 h-4" />
                 </button>
             </div>
           )}

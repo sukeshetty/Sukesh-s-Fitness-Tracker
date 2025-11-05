@@ -15,7 +15,7 @@ const ThemeToggle: React.FC = () => {
       {theme === 'dark' ? (
         <SunIcon className="w-5 h-5 text-yellow-400" />
       ) : (
-        <MoonIcon className="w-5 h-5 text-blue-400" />
+        <MoonIcon className="w-5 h-5 text-pink-400" />
       )}
     </button>
   );

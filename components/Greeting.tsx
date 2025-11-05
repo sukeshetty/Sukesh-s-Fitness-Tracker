@@ -1,48 +1,66 @@
-
 import React from 'react';
-import { GeminiStarIcon } from './Icons';
+import { CoachIcon, ScienceIcon, HourglassIcon, LightbulbIcon } from './Icons';
 
 interface SuggestionCardProps {
   title: string;
   description: string;
   onClick: () => void;
+  icon: React.ReactNode;
 }
 
-const SuggestionCard: React.FC<SuggestionCardProps> = ({ title, description, onClick }) => (
+const SuggestionCard: React.FC<SuggestionCardProps> = ({ title, description, onClick, icon }) => (
   <button
     onClick={onClick}
-    className="bg-white/5 backdrop-blur-lg p-4 rounded-xl w-full text-left hover:bg-white/10 transition-colors border border-white/10"
+    className="bg-[var(--component-bg)] backdrop-blur-lg p-4 rounded-xl w-full text-left transition-all duration-200 border border-[var(--glass-border)] hover:bg-white/10 hover:border-white/20 flex items-start gap-4"
+    style={{ boxShadow: 'var(--card-shadow)' }}
   >
-    <p className="font-semibold text-zinc-200">{title}</p>
-    <p className="text-sm text-zinc-400">{description}</p>
+    <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-blue-400">
+        {icon}
+    </div>
+    <div>
+        <p className="font-semibold text-[var(--text-primary)]">{title}</p>
+        <p className="text-sm text-[var(--text-secondary)]">{description}</p>
+    </div>
   </button>
 );
 
 interface GreetingProps {
-  onSuggestionClick: (message: string) => void;
+  onOpenHeyCoach: () => void;
+  onOpenDietAnalysis: () => void;
+  onOpenFastingTracker: () => void;
+  onOpenWhatIfFood: () => void;
 }
 
-const Greeting: React.FC<GreetingProps> = ({ onSuggestionClick }) => {
+const Greeting: React.FC<GreetingProps> = ({ 
+    onOpenHeyCoach,
+    onOpenDietAnalysis,
+    onOpenFastingTracker,
+    onOpenWhatIfFood,
+}) => {
   const suggestions = [
     {
-      title: 'Log my breakfast',
-      description: '2 eggs, a slice of whole wheat toast, and black coffee',
-      prompt: 'For breakfast I had 2 eggs, a slice of whole wheat toast, and a black coffee'
+      title: 'Hey Coach',
+      description: 'Ask your AI coach anything about your diet, workouts, and progress.',
+      onClick: onOpenHeyCoach,
+      icon: <CoachIcon className="w-6 h-6" />,
     },
     {
-      title: 'Analyze my lunch',
-      description: 'A turkey sandwich with a side of potato chips',
-      prompt: 'I ate a turkey sandwich and a bag of potato chips for lunch'
+      title: 'What is missing in my diet?',
+      description: 'Analyze your logs to find nutritional gaps and get suggestions.',
+      onClick: onOpenDietAnalysis,
+      icon: <ScienceIcon className="w-6 h-6" />,
     },
     {
-      title: 'Review my dessert',
-      description: 'A slice of chocolate cake with a scoop of vanilla ice cream',
-      prompt: 'I had a slice of chocolate cake and vanilla ice cream for dessert.'
+      title: 'Fasting Tracker',
+      description: 'Track your intermittent fasts and monitor metabolic phases.',
+      onClick: onOpenFastingTracker,
+      icon: <HourglassIcon className="w-6 h-6" />,
     },
     {
-      title: 'What about this snack?',
-      description: 'A handful of almonds and an apple',
-      prompt: 'My afternoon snack was a handful of almonds and an apple'
+      title: 'What if I eat...?',
+      description: "See how a specific food would impact your weekly goals.",
+      onClick: onOpenWhatIfFood,
+      icon: <LightbulbIcon className="w-6 h-6" />,
     },
   ];
 
@@ -52,15 +70,16 @@ const Greeting: React.FC<GreetingProps> = ({ onSuggestionClick }) => {
         <h1 className="text-5xl md:text-6xl font-medium bg-gradient-to-r from-blue-400 to-purple-400 text-transparent bg-clip-text mb-4">
           Hello, there.
         </h1>
-        <p className="text-zinc-400 text-xl">How can I help you today?</p>
+        <p className="text-[var(--text-secondary)] text-xl">How can I help you today?</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-12 w-full max-w-2xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-12 w-full max-w-3xl">
         {suggestions.map((s, i) => (
           <SuggestionCard 
             key={i} 
             title={s.title} 
             description={s.description} 
-            onClick={() => onSuggestionClick(s.prompt)} 
+            onClick={s.onClick}
+            icon={s.icon}
           />
         ))}
       </div>

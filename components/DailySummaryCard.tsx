@@ -1,18 +1,20 @@
-
 import React, { useMemo } from 'react';
 import { ChatMessage, MessageRole, DailyTargets } from '../types';
 import AnimatedNumber from './AnimatedNumber';
+import { FireIcon } from './Icons';
+import { useTheme } from './contexts/ThemeContext';
 
 interface DailySummaryCardProps {
   messages: ChatMessage[];
   dailyTargets?: DailyTargets;
 }
 
-const ProgressBar: React.FC<{ value: number; max: number; }> = ({ value, max }) => {
+const ProgressBar: React.FC<{ value: number; max: number; isLight: boolean; }> = ({ value, max, isLight }) => {
     const percentage = max > 0 ? Math.min((value / max) * 100, 100) : 0;
-    const color = value > max ? 'bg-red-500' : 'bg-green-500';
+    const color = value > max * 1.1 ? 'bg-red-500' : 'bg-green-500';
+    const trackColor = isLight ? 'bg-rose-100' : 'bg-zinc-800';
     return (
-        <div className="h-2 bg-zinc-800 rounded-full overflow-hidden">
+        <div className={`h-2 ${trackColor} rounded-full overflow-hidden`}>
             <div className={`h-full rounded-full ${color}`} style={{ width: `${percentage}%` }} />
         </div>
     );
@@ -20,21 +22,32 @@ const ProgressBar: React.FC<{ value: number; max: number; }> = ({ value, max }) 
 
 
 const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ messages, dailyTargets }) => {
+  const { theme } = useTheme();
+  const isLight = theme === 'light';
+
   const dailyTotals = useMemo(() => {
-    let totalCalories = 0, totalProtein = 0, totalFat = 0;
+    let caloriesIn = 0, protein = 0, fat = 0, caloriesOut = 0;
     messages.forEach((msg) => {
-      if (msg.role === MessageRole.MODEL && msg.nutritionData) {
-        msg.nutritionData.forEach((item) => {
-          totalCalories += item.calories;
-          totalProtein += item.protein;
-          totalFat += item.fat;
-        });
-      }
+        if (msg.role === MessageRole.MODEL) {
+            if (msg.nutritionData) {
+                msg.nutritionData.forEach((item) => {
+                    caloriesIn += item.calories;
+                    protein += item.protein;
+                    fat += item.fat;
+                });
+            }
+            if (msg.activityData) {
+                msg.activityData.forEach((item) => {
+                    caloriesOut += item.caloriesBurned;
+                })
+            }
+        }
     });
     return {
-      calories: Math.round(totalCalories),
-      protein: Math.round(totalProtein),
-      fat: Math.round(totalFat),
+      caloriesIn: Math.round(caloriesIn),
+      protein: Math.round(protein),
+      fat: Math.round(fat),
+      caloriesOut: Math.round(caloriesOut),
     };
   }, [messages]);
   
@@ -50,45 +63,61 @@ const DailySummaryCard: React.FC<DailySummaryCardProps> = ({ messages, dailyTarg
   
   const lastMessage = messages[messages.length - 1];
   const dateString = lastMessage ? getFormattedDate(lastMessage.timestamp) : '';
+  const netCalories = dailyTotals.caloriesIn - dailyTotals.caloriesOut;
 
-  if (dailyTotals.calories === 0 && dailyTotals.protein === 0 && dailyTotals.fat === 0) return null;
+  if (dailyTotals.caloriesIn === 0 && dailyTotals.protein === 0 && dailyTotals.fat === 0 && dailyTotals.caloriesOut === 0) return null;
+
+  const cardClasses = isLight 
+    ? 'bg-gradient-to-br from-pink-100 to-rose-100 ring-rose-200'
+    : 'bg-gradient-to-br from-blue-600/20 to-purple-600/20 ring-blue-500/30';
+  
+  const headerTextClasses = isLight ? 'text-pink-800' : 'text-blue-300';
+  const metaTextClasses = isLight ? 'text-rose-500' : 'text-zinc-400';
+  const labelTextClasses = isLight ? 'text-rose-700' : 'text-zinc-300';
 
   return (
-    <div className="bg-gradient-to-br from-blue-600/20 to-purple-600/20 backdrop-blur-lg p-5 rounded-xl ring-1 ring-blue-500/30 shadow-lg">
+    <div
+      className={`backdrop-blur-lg p-5 rounded-xl ring-1 shadow-lg ${cardClasses}`}
+      style={{ boxShadow: 'var(--card-shadow)' }}
+    >
        <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
             <span className="text-2xl">📊</span>
-            <h3 className="font-bold text-blue-300 text-lg">Daily Totals</h3>
+            <h3 className={`font-bold text-lg ${headerTextClasses}`}>Daily Totals</h3>
         </div>
-        <span className="text-xs text-zinc-400 text-right">{dateString}</span>
+        <span className={`text-xs text-right ${metaTextClasses}`}>{dateString}</span>
       </div>
       
       {dailyTargets ? (
         <div className="space-y-3">
             <div>
-                <div className="flex justify-between text-sm mb-1 text-zinc-300">
-                    <span>Calories</span>
-                    <span><AnimatedNumber value={dailyTotals.calories} duration={800} /> / {dailyTargets.calories}</span>
+                <div className={`flex justify-between text-sm mb-1 ${labelTextClasses}`}>
+                    <span>Net Calories</span>
+                    <div className='flex items-center gap-2'>
+                        <span className='text-green-500'>(<AnimatedNumber value={dailyTotals.caloriesIn} /> In</span>
+                        <span className='text-orange-500'>- <AnimatedNumber value={dailyTotals.caloriesOut} /> Out)</span>
+                        <span><AnimatedNumber value={netCalories} /> / {dailyTargets.calories}</span>
+                    </div>
                 </div>
-                <ProgressBar value={dailyTotals.calories} max={dailyTargets.calories} />
+                <ProgressBar value={netCalories} max={dailyTargets.calories} isLight={isLight} />
             </div>
             <div>
-                <div className="flex justify-between text-sm mb-1 text-zinc-300">
+                <div className={`flex justify-between text-sm mb-1 ${labelTextClasses}`}>
                     <span>Protein</span>
                     <span><AnimatedNumber value={dailyTotals.protein} duration={800} suffix="g" /> / {dailyTargets.protein}g</span>
                 </div>
-                <ProgressBar value={dailyTotals.protein} max={dailyTargets.protein} />
+                <ProgressBar value={dailyTotals.protein} max={dailyTargets.protein} isLight={isLight} />
             </div>
             <div>
-                <div className="flex justify-between text-sm mb-1 text-zinc-300">
+                <div className={`flex justify-between text-sm mb-1 ${labelTextClasses}`}>
                     <span>Fat</span>
                     <span><AnimatedNumber value={dailyTotals.fat} duration={800} suffix="g" /> / {dailyTargets.fat}g</span>
                 </div>
-                <ProgressBar value={dailyTotals.fat} max={dailyTargets.fat} />
+                <ProgressBar value={dailyTotals.fat} max={dailyTargets.fat} isLight={isLight} />
             </div>
         </div>
       ) : (
-        <p className="text-center text-zinc-400 text-sm">Set your profile to see progress against daily goals.</p>
+        <p className={`text-center text-sm ${metaTextClasses}`}>Set your profile to see progress against daily goals.</p>
       )}
     </div>
   );

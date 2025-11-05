@@ -12,12 +12,21 @@ export interface Ingredient {
   isHealthy: boolean;
 }
 
+export interface Activity {
+  activity: string;
+  duration: number; // in minutes
+  caloriesBurned: number;
+  notes: string;
+  emoji: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: MessageRole;
   content: string;
   imageUrl?: string;
   nutritionData?: Ingredient[];
+  activityData?: Activity[];
   timestamp: string;
 }
 
@@ -40,35 +49,14 @@ export interface DailyTargets {
   lastUpdatedBy: 'ai' | 'user';
 }
 
-export interface FavoriteFood {
-  name: string;
-  content: string;
-  useCount: number;
-  lastUsed: string;
-  tags?: string[];
-}
-
-export interface Exercise {
-  id: string;
-  type: string;
-  duration: number; // in minutes
-  caloriesBurned: number;
-  notes: string;
-  timestamp: string;
-}
-
-export interface ExerciseLog {
-  date: string; // YYYY-MM-DD
-  exercises: Exercise[];
-  totalCaloriesBurned: number;
-}
-
 export interface DailySummaryEntry {
   date: string;
   totals: {
     calories: number;
     protein: number;
     fat: number;
+    totalCaloriesBurned: number;
+    totalMinutesActive: number;
   };
   targets: {
     calories: number;
@@ -81,4 +69,28 @@ export interface DailySummaryEntry {
     protein: boolean;
     fat: boolean;
   };
+}
+
+export interface FastingState {
+  startTime: string | null;
+  isActive: boolean;
+  planName: string | null;
+  targetHours: number | null;
+}
+
+
+// FIX: Add Exercise and ExerciseLog interfaces for the ExerciseLogger component.
+export interface Exercise {
+  id: string;
+  type: string;
+  duration: number; // in minutes
+  caloriesBurned: number;
+  notes: string;
+  timestamp: string;
+}
+
+export interface ExerciseLog {
+  date: string;
+  exercises: Exercise[];
+  totalCaloriesBurned: number;
 }

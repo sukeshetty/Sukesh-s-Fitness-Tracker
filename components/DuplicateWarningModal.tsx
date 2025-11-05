@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface DuplicateWarningModalProps {
@@ -20,11 +19,11 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-[var(--modal-overlay-bg)] backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={onCancel}
     >
       <div 
-        className="bg-black/50 backdrop-blur-xl rounded-2xl ring-1 ring-yellow-500/30 w-full max-w-md shadow-2xl"
+        className="bg-[var(--component-bg)] backdrop-blur-xl rounded-2xl ring-1 ring-yellow-500/30 w-full max-w-md shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">
@@ -36,13 +35,13 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
               <h3 className="text-lg font-bold text-yellow-400 mb-2">
                 Duplicate Food Entry Detected
               </h3>
-              <p className="text-zinc-300 text-sm mb-3">
-                You already logged <span className="font-semibold text-white">"{duplicateContent}"</span>
+              <p className="text-[var(--text-secondary)] text-sm mb-3">
+                You already logged <span className="font-semibold text-[var(--text-primary)]">"{duplicateContent}"</span>
                 {minutesAgo === 0 
                   ? ' just a moment ago' 
                   : ` ${minutesAgo} minute${minutesAgo === 1 ? '' : 's'} ago`}.
               </p>
-              <p className="text-zinc-400 text-xs">
+              <p className="text-[var(--text-secondary)] text-xs">
                 Do you want to log this meal again?
               </p>
             </div>
