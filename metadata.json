@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Food Co-pilot",
+  "description": "A one-page PWA app where users can enter information about food they have consumed, and Gemini 2.5 Pro provides insightful feedback, acting as a personal nutrition co-pilot.",
+  "requestFramePermissions": []
+}
