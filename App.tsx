@@ -6,6 +6,7 @@ import ChatMessageBubble from './components/ChatMessage';
 import DailySummaryView from './components/DailySummaryView';
 import Greeting from './components/Greeting';
 import { ChartBarIcon } from './components/Icons';
+import DuplicateWarningModal from './components/DuplicateWarningModal';
 
 const SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
 
@@ -91,6 +92,39 @@ const parseNutritionResponse = (text: string): { nutritionData?: Ingredient[]; r
     return { nutritionData: undefined, remainingText: text };
 };
 
+// Levenshtein distance algorithm for similarity checking
+const calculateSimilarity = (str1: string, str2: string): number => {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  const getEditDistance = (s1: string, s2: string): number => {
+    const costs: number[] = [];
+    for (let i = 0; i <= s1.length; i++) {
+      let lastValue = i;
+      for (let j = 0; j <= s2.length; j++) {
+        if (i === 0) {
+          costs[j] = j;
+        } else if (j > 0) {
+          let newValue = costs[j - 1];
+          if (s1.charAt(i - 1) !== s2.charAt(j - 1)) {
+            newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+          }
+          costs[j - 1] = lastValue;
+          lastValue = newValue;
+        }
+      }
+      if (i > 0) costs[s2.length] = lastValue;
+    }
+    return costs[s2.length];
+  };
+
+  const editDistance = getEditDistance(longer, shorter);
+  return (longer.length - editDistance) / longer.length;
+};
+
+
 type LoadingState = { type: 'idle' } | { type: 'sending' } | { type: 'editing', id: string };
 
 const App: React.FC = () => {
@@ -100,6 +134,17 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [duplicateWarning, setDuplicateWarning] = useState<{
+    show: boolean;
+    content: string;
+    minutesAgo: number;
+    pendingMessage: { userInput: string; imageUrl?: string } | null;
+  }>({
+    show: false,
+    content: '',
+    minutesAgo: 0,
+    pendingMessage: null,
+  });
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef(messages);
@@ -196,23 +241,8 @@ const App: React.FC = () => {
     const { nutritionData, remainingText } = parseNutritionResponse(modelResponse);
     onComplete(nutritionData, remainingText);
   };
-
-  const handleSendMessage = useCallback(async (userInput: string, imageUrl?: string) => {
-    if (!userInput.trim()) return;
   
-    const normalizedInput = userInput.trim().toLowerCase();
-    const isDuplicate = messagesRef.current.some(
-      (msg) => msg.role === MessageRole.USER && 
-               msg.content.trim().toLowerCase() === normalizedInput &&
-               !msg.imageUrl && !imageUrl
-    );
-  
-    if (isDuplicate) {
-      if (!confirm("This looks like a duplicate food log. Do you want to submit it again?")) {
-        return;
-      }
-    }
-  
+  const handleSendMessageInternal = async (userInput: string, imageUrl?: string) => {
     setError(null);
     setLoadingState({ type: 'sending' });
   
@@ -251,7 +281,60 @@ const App: React.FC = () => {
     } finally {
       setLoadingState({ type: 'idle' });
     }
+  };
+
+
+  const handleSendMessage = useCallback(async (userInput: string, imageUrl?: string) => {
+    if (!userInput.trim()) return;
+  
+    const normalizedInput = userInput.trim().toLowerCase();
+    
+    // Enhanced duplicate detection
+    const recentTimeThreshold = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const now = Date.now();
+    
+    const duplicateMatches = messagesRef.current.filter((msg) => {
+      if (msg.role !== MessageRole.USER) return false;
+      
+      const msgTime = new Date(msg.timestamp).getTime();
+      const timeDiff = now - msgTime;
+      const isRecent = timeDiff < recentTimeThreshold;
+      
+      const isExactMatch = msg.content.trim().toLowerCase() === normalizedInput;
+      const isSimilar = calculateSimilarity(msg.content.trim().toLowerCase(), normalizedInput) > 0.85;
+      
+      return (isExactMatch || isSimilar) && isRecent && !msg.imageUrl && !imageUrl;
+    });
+    
+    if (duplicateMatches.length > 0) {
+      const lastDuplicate = duplicateMatches[duplicateMatches.length - 1];
+      const minutesAgo = Math.round((now - new Date(lastDuplicate.timestamp).getTime()) / 60000);
+      
+      setDuplicateWarning({
+        show: true,
+        content: lastDuplicate.content,
+        minutesAgo,
+        pendingMessage: { userInput, imageUrl },
+      });
+      return;
+    }
+
+    await handleSendMessageInternal(userInput, imageUrl);
   }, []);
+  
+  const handleConfirmDuplicate = useCallback(async () => {
+    const pending = duplicateWarning.pendingMessage;
+    setDuplicateWarning({ show: false, content: '', minutesAgo: 0, pendingMessage: null });
+    
+    if (pending) {
+      await handleSendMessageInternal(pending.userInput, pending.imageUrl);
+    }
+  }, [duplicateWarning]);
+
+  const handleCancelDuplicate = useCallback(() => {
+    setDuplicateWarning({ show: false, content: '', minutesAgo: 0, pendingMessage: null });
+  }, []);
+
   
   const handleImageForAnalysis = async (file: File) => {
     if (loadingState.type !== 'idle') return;
@@ -285,7 +368,7 @@ const App: React.FC = () => {
         
         setMessages(prev => prev.map(msg => msg.id === userMessage.id ? { ...msg, content: foodDescription } : msg));
         
-        await handleSendMessage(foodDescription);
+        await handleSendMessage(foodDescription, imageUrl); // Pass imageUrl to check for duplicates correctly
 
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
@@ -424,7 +507,7 @@ const App: React.FC = () => {
         <main className="flex-1 overflow-y-auto px-4 md:px-6">
             <div className="max-w-4xl mx-auto w-full h-full">
               {messages.length === 0 ? (
-                <Greeting onSuggestionClick={handleSendMessage} />
+                <Greeting onSuggestionClick={(prompt) => handleSendMessage(prompt)} />
               ) : (
                 <>
                 {groupedMessages.map(({ date, messagesForDay }) => (
@@ -491,6 +574,13 @@ const App: React.FC = () => {
         messages={messages} 
         isOpen={isSummaryOpen} 
         onClose={() => setIsSummaryOpen(false)} 
+      />
+      <DuplicateWarningModal
+        isOpen={duplicateWarning.show}
+        duplicateContent={duplicateWarning.content}
+        minutesAgo={duplicateWarning.minutesAgo}
+        onConfirm={handleConfirmDuplicate}
+        onCancel={handleCancelDuplicate}
       />
     </div>
   );
