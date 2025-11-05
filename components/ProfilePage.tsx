@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { UserProfile, DailyTargets } from '../types';
@@ -6,7 +5,6 @@ import Spinner from './Spinner';
 import { CloseIcon } from './Icons';
 
 interface ProfilePageProps {
-  isOpen: boolean;
   onClose: () => void;
   userProfile: UserProfile | null;
   onSave: (profile: UserProfile) => void;
@@ -29,7 +27,7 @@ const defaultProfile: UserProfile = {
     },
 };
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ isOpen, onClose, userProfile, onSave }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave }) => {
   const [profile, setProfile] = useState<UserProfile>(userProfile || defaultProfile);
   const [newCondition, setNewCondition] = useState('');
   const [loading, setLoading] = useState<'idle' | 'calculating' | 'validating'>('idle');
@@ -37,7 +35,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ isOpen, onClose, userProfile,
   
   useEffect(() => {
     setProfile(userProfile || defaultProfile);
-  }, [userProfile, isOpen]);
+  }, [userProfile]);
 
   const calculateAITargets = async () => {
     setLoading('calculating');
@@ -99,8 +97,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ isOpen, onClose, userProfile,
   const handleRemoveCondition = (condition: string) => {
     setProfile(p => ({ ...p, healthConditions: p.healthConditions.filter(c => c !== condition) }));
   };
-
-  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
@@ -106,7 +105,7 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
       </div>
       
       <div className={`flex-1 flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1 min-w-0`}>
-         <p className={`w-full font-semibold text-zinc-200 text-md ${isUser ? 'text-right' : 'text-left'}`}>{isUser ? 'You' : 'SukeshFIT'}</p>
+         <p className={`w-full font-semibold text-[var(--text-primary)] text-md ${isUser ? 'text-right' : 'text-left'}`}>{isUser ? 'You' : 'SukeshFIT'}</p>
         {isEditing ? (
              <InlineEditForm 
                 initialContent={message.content}
@@ -117,7 +116,7 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
         ) : (
             <>
                 {message.imageUrl && (
-                    <div className="mt-2 mb-2 w-full max-w-xs rounded-lg overflow-hidden ring-1 ring-white/10">
+                    <div className="mt-2 mb-2 w-full max-w-xs rounded-lg overflow-hidden ring-1 ring-[var(--glass-border)]">
                         <img src={message.imageUrl} alt="User upload" className="w-full h-auto object-cover"/>
                     </div>
                 )}
@@ -135,7 +134,7 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
                 {message.content ? (
                     <div className="flex items-center gap-2 w-full">
                         <div
-                            className={`prose prose-invert prose-p:my-2 prose-headings:my-3 max-w-none text-zinc-200 ${isUser ? '[&_p]:text-right w-full' : 'prose-p:text-left'}`}
+                            className={`prose prose-invert prose-p:my-2 prose-headings:my-3 max-w-none text-[var(--text-primary)] prose-p:text-[var(--text-primary)] prose-strong:text-[var(--text-primary)] ${isUser ? '[&_p]:text-right w-full' : 'prose-p:text-left'}`}
                             dangerouslySetInnerHTML={{ __html: sanitizedMarkup }}
                         />
                         {!isUser && <TTSButton textToSpeak={message.content} />}
@@ -152,7 +151,7 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
                 )}
 
                 {isLoading && (
-                    <div className="flex items-center text-zinc-400">
+                    <div className="flex items-center text-[var(--text-secondary)]">
                         <BlinkingCursor />
                     </div>
                 )}
@@ -174,8 +173,8 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
                 <button
                     onClick={() => onSaveMeal(message.content)}
                     className="text-zinc-400 hover:text-zinc-100 p-2 rounded-full hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Save meal"
-                    aria-label="Save meal"
+                    title="Save meal as favorite"
+                    aria-label="Save meal as favorite"
                     disabled={isProcessing}
                     >
                     <BookmarkIcon className="w-4 h-4" />

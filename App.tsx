@@ -1,14 +1,17 @@
-
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
-import { ChatMessage, MessageRole, Ingredient, SavedMeal, UserProfile, DailyTargets } from './types';
+import { ChatMessage, MessageRole, Ingredient, UserProfile, DailySummaryEntry, FavoriteFood } from './types';
 import ChatInput from './components/ChatInput';
 import ChatMessageBubble from './components/ChatMessage';
-import DailySummaryView from './components/DailySummaryView';
 import Greeting from './components/Greeting';
-import { ChartBarIcon, UserIcon } from './components/Icons';
+import { UserIcon, CalendarIcon, ChartBarIcon } from './components/Icons';
 import DuplicateWarningModal from './components/DuplicateWarningModal';
 import ProfilePage from './components/ProfilePage';
+import DailySummaryHistory from './components/DailySummaryHistory';
+import ExerciseLogger from './components/ExerciseLogger';
+import Reports from './components/Reports';
+import FavoriteFoods from './components/FavoriteFoods';
+import ThemeToggle from './components/ThemeToggle';
 
 const BASE_SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
 
@@ -43,21 +46,11 @@ Following the JSON block, provide conversational feedback in Markdown.
 
 Do not provide medical advice. Just your expert nutritional judgment with health-aware guidance.`;
 
-const SAVED_MEALS_KEY = 'gemini-food-copilot-saved-meals';
 const USER_PROFILE_KEY = 'gemini-food-copilot-user-profile';
+const FAVORITE_FOODS_KEY = 'gemini-food-copilot-favorite-foods';
+const DAILY_SUMMARIES_KEY = 'gemini-food-copilot-daily-summaries';
 
 const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
-
-const fileToGenerativePart = async (file: File) => {
-  const base64EncodedDataPromise = new Promise<string>((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-    reader.readAsDataURL(file);
-  });
-  return {
-    inlineData: { data: await base64EncodedDataPromise, mimeType: file.type },
-  };
-};
 
 const parseNutritionResponse = (text: string): { nutritionData?: Ingredient[]; remainingText: string } => {
     const jsonRegex = /```json\n([\s\S]*?)\n```/;
@@ -119,13 +112,15 @@ type LoadingState = { type: 'idle' } | { type: 'sending' } | { type: 'editing', 
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [savedMeals, setSavedMeals] = useState<SavedMeal[]>([]);
   const [loadingState, setLoadingState] = useState<LoadingState>({ type: 'idle' });
   const [error, setError] = useState<string | null>(null);
-  const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [isExerciseOpen, setIsExerciseOpen] = useState(false);
+  const [isReportsOpen, setIsReportsOpen] = useState(false);
   
   const [duplicateWarning, setDuplicateWarning] = useState<{
     show: boolean;
@@ -140,34 +135,19 @@ const App: React.FC = () => {
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
-  // Load saved meals and profile from local storage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(SAVED_MEALS_KEY);
-      if (saved) setSavedMeals(JSON.parse(saved));
-      
       const profileJson = localStorage.getItem(USER_PROFILE_KEY);
       if (profileJson) {
         setUserProfile(JSON.parse(profileJson));
       } else {
-        // If no profile, open the modal to prompt the user
         setIsProfileOpen(true);
       }
     } catch (error) {
-      console.error("Could not load data from localStorage:", error);
+      console.error("Could not load profile from localStorage:", error);
     }
   }, []);
 
-  // Save meals and profile to local storage
-  useEffect(() => {
-    try {
-      localStorage.setItem(SAVED_MEALS_KEY, JSON.stringify(savedMeals));
-    } catch (error) {
-      console.error("Could not save meals:", error);
-      setError("Failed to save meals. Your browser storage might be full.");
-    }
-  }, [savedMeals]);
-  
   const handleSaveProfile = useCallback((profile: UserProfile) => {
     setUserProfile(profile);
     try {
@@ -179,31 +159,61 @@ const App: React.FC = () => {
     setIsProfileOpen(false);
   }, []);
 
-  // Cleanup blob URLs on unmount to prevent memory leaks
-  useEffect(() => {
-    return () => { messages.forEach(msg => { if (msg.imageUrl?.startsWith('blob:')) URL.revokeObjectURL(msg.imageUrl); }); };
-  }, [messages]);
+  const saveDailySummary = useCallback(() => {
+    if (!userProfile) return;
 
-  const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
-  useEffect(() => { if (!editingMessageId) scrollToBottom(); }, [messages, editingMessageId]);
-  
+    const today = new Date().toISOString().split('T')[0];
+    const todayMessages = messages.filter(m => m.timestamp.startsWith(today) && m.role === MessageRole.MODEL && m.nutritionData);
+
+    let totalCalories = 0, totalProtein = 0, totalFat = 0;
+    todayMessages.forEach(msg => {
+      msg.nutritionData?.forEach(item => {
+        totalCalories += Number(item.calories) || 0;
+        totalProtein += Number(item.protein) || 0;
+        totalFat += Number(item.fat) || 0;
+      });
+    });
+
+    const summary: DailySummaryEntry = {
+      date: today,
+      totals: { calories: Math.round(totalCalories), protein: Math.round(totalProtein), fat: Math.round(totalFat) },
+      targets: userProfile.dailyTargets,
+      mealsLogged: todayMessages.length,
+      goalsMet: {
+        calories: totalCalories <= userProfile.dailyTargets.calories * 1.1,
+        protein: totalProtein >= userProfile.dailyTargets.protein * 0.9,
+        fat: totalFat <= userProfile.dailyTargets.fat * 1.1,
+      },
+    };
+
+    const saved = localStorage.getItem(DAILY_SUMMARIES_KEY);
+    const summaries: DailySummaryEntry[] = saved ? JSON.parse(saved) : [];
+    const existingIndex = summaries.findIndex((s) => s.date === today);
+    if (existingIndex >= 0) {
+      summaries[existingIndex] = summary;
+    } else {
+      summaries.push(summary);
+    }
+    localStorage.setItem(DAILY_SUMMARIES_KEY, JSON.stringify(summaries));
+  }, [messages, userProfile]);
+
+  useEffect(() => {
+    if (messages.length > 0) saveDailySummary();
+  }, [messages, saveDailySummary]);
+
   const getEnhancedSystemInstruction = useCallback(() => {
     if (!userProfile) return BASE_SYSTEM_INSTRUCTION;
     let instruction = BASE_SYSTEM_INSTRUCTION;
     if (userProfile.healthConditions.length > 0) {
       instruction += `\n\nUSER HEALTH CONDITIONS: ${userProfile.healthConditions.join(', ')}.`;
-      instruction += `\nAlways consider these conditions when evaluating foods and provide warnings for incompatible items.`;
     }
     instruction += `\n\nUSER DAILY TARGETS: ${userProfile.dailyTargets.calories} calories, ${userProfile.dailyTargets.protein}g protein, ${userProfile.dailyTargets.fat}g fat.`;
-    instruction += `\nProvide context on how each meal fits into their daily targets.`;
     return instruction;
   }, [userProfile]);
-
 
   useEffect(() => {
     const initializeChat = () => {
       try {
-        if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const chat = ai.chats.create({
           model: 'gemini-2.5-pro',
@@ -212,7 +222,6 @@ const App: React.FC = () => {
         chatSessionRef.current = chat;
       } catch (e) {
         setError(e instanceof Error ? `Initialization failed: ${e.message}` : "An unknown error occurred during initialization.");
-        console.error(e);
       }
     };
     initializeChat();
@@ -245,10 +254,8 @@ const App: React.FC = () => {
         (nutritionData, remainingText) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m))
       );
     } catch (e) {
-      const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
-      setError(`Failed to get response: ${errorMessage}`);
+      setError(`Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
       setMessages(prev => prev.filter(msg => msg.id !== userMessage.id && msg.id !== modelMessage.id));
-      console.error(e);
     } finally {
       setLoadingState({ type: 'idle' });
     }
@@ -262,14 +269,13 @@ const App: React.FC = () => {
     const duplicateMatches = messagesRef.current.filter((msg) => {
       if (msg.role !== MessageRole.USER) return false;
       const msgTime = new Date(msg.timestamp).getTime();
-      const timeDiff = now - msgTime;
-      const isRecent = timeDiff < recentTimeThreshold;
-      const isSimilar = calculateSimilarity(msg.content.trim().toLowerCase(), normalizedInput) > 0.85;
-      return isSimilar && isRecent && !msg.imageUrl && !imageUrl;
+      return (now - msgTime) < recentTimeThreshold && 
+             calculateSimilarity(msg.content.trim().toLowerCase(), normalizedInput) > 0.85 && 
+             !msg.imageUrl && !imageUrl;
     });
     
     if (duplicateMatches.length > 0) {
-      const lastDuplicate = duplicateMatches[duplicateMatches.length - 1];
+      const lastDuplicate = duplicateMatches.pop()!;
       const minutesAgo = Math.round((now - new Date(lastDuplicate.timestamp).getTime()) / 60000);
       setDuplicateWarning({ show: true, content: lastDuplicate.content, minutesAgo, pendingMessage: { userInput, imageUrl } });
       return;
@@ -291,23 +297,25 @@ const App: React.FC = () => {
     setError(null);
     const imageUrl = URL.createObjectURL(file);
     const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: "Analyzing image...", imageUrl, timestamp: new Date().toISOString() };
-    setMessages(prev => [...prev, userMessage]);
+    const modelMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.MODEL, content: '', timestamp: new Date().toISOString() };
+    setMessages(prev => [...prev, userMessage, modelMessage]);
 
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const imagePart = await fileToGenerativePart(file);
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: { parts: [ { text: "Describe the food items in this image for a nutrition log. Be descriptive and concise." }, imagePart ] },
-        });
+        const imagePart = { inlineData: { data: await new Promise<string>(r => {const reader = new FileReader(); reader.onloadend = () => r((reader.result as string).split(',')[1]); reader.readAsDataURL(file);}), mimeType: file.type }};
+        const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: { parts: [ { text: "Describe the food items in this image for a nutrition log. Be descriptive and concise." }, imagePart ] } });
         const foodDescription = response.text;
         setMessages(prev => prev.map(msg => msg.id === userMessage.id ? { ...msg, content: foodDescription } : msg));
-        await handleSendMessage(foodDescription);
+        
+        await streamModelResponse(
+          foodDescription,
+          (modelResponse) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m)),
+          (nutritionData, remainingText) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m))
+        );
     } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
-        setError(`Image analysis failed: ${errorMessage}`);
-        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
-        console.error(e);
+        setError(`Image analysis failed: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
+        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id && msg.id !== modelMessage.id));
+    } finally {
         setLoadingState({ type: 'idle' });
     }
   };
@@ -339,32 +347,29 @@ const App: React.FC = () => {
         (nutritionData, remainingText) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m))
       );
     } catch (e) {
-        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
-        setError(`Failed to get response: ${errorMessage}`);
+        setError(`Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
         setMessages(originalMessages);
-        console.error(e);
     } finally {
         setLoadingState({ type: 'idle' });
     }
   }, []);
 
-  const handleSaveMeal = useCallback((mealContent: string) => {
+  const handleSaveMealAsFavorite = useCallback((mealContent: string) => {
     const defaultName = mealContent.length > 25 ? `${mealContent.substring(0, 25)}...` : mealContent;
-    const mealName = prompt("Enter a name for this meal:", defaultName);
+    const mealName = prompt("Enter a name for this favorite meal:", defaultName);
     if (mealName) {
-        const newMeal: SavedMeal = { name: mealName.trim(), content: mealContent };
-        if (savedMeals.some(meal => meal.name.toLowerCase() === newMeal.name.toLowerCase())) {
-            if (!confirm(`A meal named "${newMeal.name}" already exists. Overwrite it?`)) return;
-            setSavedMeals(prev => prev.map(meal => meal.name.toLowerCase() === newMeal.name.toLowerCase() ? newMeal : meal));
-        } else {
-            setSavedMeals(prev => [...prev, newMeal]);
-        }
-    }
-  }, [savedMeals]);
+        const saved = localStorage.getItem(FAVORITE_FOODS_KEY);
+        const favorites: FavoriteFood[] = saved ? JSON.parse(saved) : [];
+        const existingIndex = favorites.findIndex(f => f.name.toLowerCase() === mealName.trim().toLowerCase());
 
-  const handleDeleteSavedMeal = useCallback((mealName: string) => {
-    if (confirm(`Are you sure you want to delete the meal "${mealName}"?`)) {
-        setSavedMeals(prev => prev.filter(meal => meal.name !== mealName));
+        if (existingIndex >= 0) {
+            if (!confirm(`A favorite named "${mealName.trim()}" already exists. Overwrite it?`)) return;
+            favorites[existingIndex] = { ...favorites[existingIndex], content: mealContent };
+        } else {
+            favorites.push({ name: mealName.trim(), content: mealContent, useCount: 1, lastUsed: new Date().toISOString() });
+        }
+        localStorage.setItem(FAVORITE_FOODS_KEY, JSON.stringify(favorites));
+        alert(`"${mealName.trim()}" saved to favorites!`);
     }
   }, []);
 
@@ -379,7 +384,6 @@ const App: React.FC = () => {
   };
 
   const groupedMessages = useMemo(() => {
-    if (messages.length === 0) return [];
     const groups: { [date: string]: ChatMessage[] } = {};
     messages.forEach(msg => {
         if (!msg.timestamp) return;
@@ -387,112 +391,79 @@ const App: React.FC = () => {
         if (!groups[dateKey]) groups[dateKey] = [];
         groups[dateKey].push(msg);
     });
-    return Object.keys(groups)
-        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
-        .map(date => ({ date, messagesForDay: groups[date] }));
+    return Object.entries(groups).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime());
   }, [messages]);
 
+  useEffect(() => { if (!editingMessageId) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [groupedMessages, editingMessageId]);
+
   return (
-    <div className="flex flex-col h-screen bg-transparent text-white font-sans">
-      <header className="bg-black/30 backdrop-blur-lg p-4 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-white/10">
-        <div className="flex items-center gap-3">
-            <h1 className="text-xl font-medium text-zinc-200">SukeshFIT</h1>
-        </div>
-        <div className="flex items-center gap-2">
-            <button onClick={() => setIsSummaryOpen(true)} className="p-2 text-zinc-400 hover:text-zinc-100 transition-colors" aria-label="Show daily summary" >
-                <ChartBarIcon className="w-6 h-6"/>
-            </button>
-            <button onClick={() => setIsProfileOpen(true)} className="p-2 text-zinc-400 hover:text-zinc-100 transition-colors" aria-label="Open Profile" >
-                <UserIcon className="w-6 h-6"/>
-            </button>
+    <div className="flex flex-col h-screen bg-transparent text-zinc-200 font-sans">
+      <header className="bg-black/30 backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-[var(--glass-border)]">
+        <h1 className="text-xl font-medium text-[var(--text-primary)]">SukeshFIT</h1>
+        <div className="flex items-center gap-1 sm:gap-2">
+            <button onClick={() => setIsExerciseOpen(true)} title="Log Exercise" className="p-2 text-zinc-400 hover:text-orange-400 transition-colors"><span className="text-xl">🏃</span></button>
+            <button onClick={() => setIsHistoryOpen(true)} title="Daily History" className="p-2 text-zinc-400 hover:text-indigo-400 transition-colors"><CalendarIcon className="w-6 h-6"/></button>
+            <button onClick={() => setIsReportsOpen(true)} title="Weekly/Monthly Reports" className="p-2 text-zinc-400 hover:text-purple-400 transition-colors"><ChartBarIcon className="w-6 h-6"/></button>
+            <button onClick={() => setIsProfileOpen(true)} title="Profile" className="p-2 text-zinc-400 hover:text-blue-400 transition-colors"><UserIcon className="w-6 h-6"/></button>
+            <ThemeToggle />
         </div>
       </header>
       
-      <div className="flex-1 flex flex-col w-full">
-        <main className="flex-1 overflow-y-auto px-4 md:px-6">
-            <div className="max-w-4xl mx-auto w-full h-full">
-              {messages.length === 0 ? (
-                <Greeting onSuggestionClick={(prompt) => handleSendMessage(prompt)} />
-              ) : (
-                <>
-                {groupedMessages.map(({ date, messagesForDay }) => (
-                    <div key={date} className="my-4">
-                        <div className="flex justify-center my-4">
-                            <span className="bg-zinc-800 text-xs font-semibold px-3 py-1 rounded-full text-zinc-400">{getRelativeDate(date)}</span>
-                        </div>
-                        {messagesForDay.map((msg) => {
-                            const globalIndex = messages.findIndex(m => m.id === msg.id);
-                            const isMealLog = msg.role === MessageRole.USER && globalIndex + 1 < messages.length && messages[globalIndex + 1].role === MessageRole.MODEL && !!messages[globalIndex + 1].nutritionData;
-                            
-                            return (
-                                <div key={msg.id} className={`flex w-full ${msg.role === MessageRole.USER ? 'justify-end' : 'justify-start'}`}>
-                                    <ChatMessageBubble
-                                        message={msg}
-                                        isMealLog={isMealLog}
-                                        onSaveMeal={handleSaveMeal}
-                                        isEditing={editingMessageId === msg.id}
-                                        onStartEdit={setEditingMessageId}
-                                        onCancelEdit={() => setEditingMessageId(null)}
-                                        onEditMessage={handleEditMessage}
-                                        isProcessing={loadingState.type !== 'idle'}
-                                        isCurrentlySavingEdit={loadingState.type === 'editing' && loadingState.id === msg.id}
-                                        isAnalyzedModelMessage={msg.role === MessageRole.MODEL && !!msg.nutritionData && msg.nutritionData.length > 0}
-                                        messagesForSummary={messages}
-                                        dailyTargets={userProfile?.dailyTargets}
-                                    />
-                                </div>
-                            );
-                        })}
+      <main className="flex-1 overflow-y-auto px-4 md:px-6">
+        <div className="max-w-4xl mx-auto w-full h-full">
+          {messages.length === 0 ? (
+            <Greeting onSuggestionClick={(prompt) => handleSendMessage(prompt)} />
+          ) : (
+            <>
+            {groupedMessages.map(([date, messagesForDay]) => (
+                <div key={date} className="my-4">
+                    <div className="flex justify-center my-4">
+                        <span className="bg-[var(--component-bg)] backdrop-blur-sm text-xs font-semibold px-3 py-1 rounded-full text-[var(--text-secondary)]">{getRelativeDate(date)}</span>
                     </div>
-                ))}
-                <div ref={messagesEndRef} />
-                </>
-              )}
-            </div>
-        </main>
+                    {messagesForDay.map((msg) => {
+                        const globalIndex = messages.findIndex(m => m.id === msg.id);
+                        const isMealLog = msg.role === MessageRole.USER && globalIndex + 1 < messages.length && messages[globalIndex + 1].role === MessageRole.MODEL && !!messages[globalIndex + 1].nutritionData;
+                        
+                        return (
+                          <div key={msg.id} className={`flex w-full ${msg.role === MessageRole.USER ? 'justify-end' : 'justify-start'}`}>
+                              <ChatMessageBubble
+                                  message={msg} isMealLog={isMealLog} onSaveMeal={handleSaveMealAsFavorite}
+                                  isEditing={editingMessageId === msg.id} onStartEdit={setEditingMessageId}
+                                  onCancelEdit={() => setEditingMessageId(null)} onEditMessage={handleEditMessage}
+                                  isProcessing={loadingState.type !== 'idle'}
+                                  isCurrentlySavingEdit={loadingState.type === 'editing' && loadingState.id === msg.id}
+                                  isAnalyzedModelMessage={msg.role === MessageRole.MODEL && !!msg.nutritionData && msg.nutritionData.length > 0}
+                                  messagesForSummary={messages} dailyTargets={userProfile?.dailyTargets}
+                              />
+                          </div>
+                        );
+                    })}
+                </div>
+            ))}
+            <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
+      </main>
     
-        <footer className="w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[#0c0c0e] via-[#0c0c0e]/90 to-transparent">
-            <div className="max-w-4xl mx-auto">
-                {error && (
-                    <div className="bg-red-500/20 text-red-300 p-3 rounded-lg text-sm mb-2 text-center">
-                        {error}
-                    </div>
-                )}
-                <ChatInput
-                    onSendMessage={handleSendMessage}
-                    isSending={loadingState.type === 'sending'}
-                    isSubmitting={loadingState.type !== 'idle'}
-                    savedMeals={savedMeals}
-                    onDeleteSavedMeal={handleDeleteSavedMeal}
-                    onImageForAnalysis={handleImageForAnalysis}
-                />
-            </div>
-        </footer>
-      </div>
+      <footer className="w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[var(--bg-gradient-to)] via-[var(--bg-gradient-to)]/90 to-transparent">
+        <div className="max-w-4xl mx-auto">
+            {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-lg text-sm mb-2 text-center">{error}</div>}
+            <FavoriteFoods onSelectFood={(content) => handleSendMessage(content)} />
+            <ChatInput
+                onSendMessage={handleSendMessage}
+                isSending={loadingState.type === 'sending'}
+                isSubmitting={loadingState.type !== 'idle'}
+                onImageForAnalysis={handleImageForAnalysis}
+            />
+        </div>
+      </footer>
 
-      <DailySummaryView
-        isOpen={isSummaryOpen}
-        onClose={() => setIsSummaryOpen(false)}
-        messages={messages}
-        dailyTargets={userProfile?.dailyTargets}
-      />
-
-      <DuplicateWarningModal
-        isOpen={duplicateWarning.show}
-        duplicateContent={duplicateWarning.content}
-        minutesAgo={duplicateWarning.minutesAgo}
-        onConfirm={handleConfirmDuplicate}
-        onCancel={handleCancelDuplicate}
-      />
-      
-      {isProfileOpen && (
-        <ProfilePage
-            isOpen={isProfileOpen}
-            onClose={() => setIsProfileOpen(false)}
-            userProfile={userProfile}
-            onSave={handleSaveProfile}
-        />
-      )}
+      <DailySummaryHistory isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
+      <ExerciseLogger isOpen={isExerciseOpen} onClose={() => setIsExerciseOpen(false)} />
+      <Reports isOpen={isReportsOpen} onClose={() => setIsReportsOpen(false)} />
+      <DuplicateWarningModal isOpen={duplicateWarning.show} duplicateContent={duplicateWarning.content} minutesAgo={duplicateWarning.minutesAgo} onConfirm={handleConfirmDuplicate} onCancel={handleCancelDuplicate} />
+      {isProfileOpen && <ProfilePage userProfile={userProfile} onSave={handleSaveProfile} onClose={() => setIsProfileOpen(false)} />}
     </div>
   );
 };

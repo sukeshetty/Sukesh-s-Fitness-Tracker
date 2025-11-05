@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -6,20 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>SukeshFIT</title>
     <script src="https://cdn.tailwindcss.com"></script>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://aistudiocdn.com/react@^19.2.0/",
-    "react": "https://aistudiocdn.com/react@^19.2.0",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
-    "marked": "https://aistudiocdn.com/marked@^16.4.1",
-    "dompurify": "https://aistudiocdn.com/dompurify@^3.3.0"
-  }
-}
-</script>
-</head>
-  <body class="bg-gradient-to-br from-[#1a1a1d] via-[#131314] to-[#0c0c0e]">
+    <style>
+      :root, :root[data-theme="dark"] {
+        --bg-gradient-from: #1a1a1d;
+        --bg-gradient-via: #131314;
+        --bg-gradient-to: #0c0c0e;
+        --text-primary: #e4e4e7;
+        --text-secondary: #a1a1aa;
+        --glass-bg: rgba(0, 0, 0, 0.3);
+        --glass-border: rgba(255, 255, 255, 0.1);
+        --component-bg: rgba(255, 255, 255, 0.05);
+      }
+
+      :root[data-theme="light"] {
+        --bg-gradient-from: #e0e7ff;
+        --bg-gradient-via: #ffffff;
+        --bg-gradient-to: #f0f9ff;
+        --text-primary: #18181b;
+        --text-secondary: #52525b;
+        --glass-bg: rgba(255, 255, 255, 0.5);
+        --glass-border: rgba(0, 0, 0, 0.1);
+        --component-bg: rgba(0, 0, 0, 0.03);
+      }
+
+      body {
+        background-image: linear-gradient(to bottom right, var(--bg-gradient-from), var(--bg-gradient-via), var(--bg-gradient-to));
+        color: var(--text-primary);
+        transition: background 0.3s ease, color 0.3s ease;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "react/": "https://aistudiocdn.com/react@^19.2.0/",
+          "react": "https://aistudiocdn.com/react@^19.2.0",
+          "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+          "@google/genai": "https://aistudiocdn.com/@google/genai@^1.28.0",
+          "marked": "https://aistudiocdn.com/marked@^16.4.1",
+          "dompurify": "https://aistudiocdn.com/dompurify@^3.3.0"
+        }
+      }
+    </script>
+  </head>
+  <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
   </body>

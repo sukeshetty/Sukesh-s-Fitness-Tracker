@@ -1,4 +1,3 @@
-
 export enum MessageRole {
   USER = 'user',
   MODEL = 'model',
@@ -22,12 +21,6 @@ export interface ChatMessage {
   timestamp: string;
 }
 
-export interface SavedMeal {
-  name: string;
-  content: string;
-}
-
-// NEW: User Profile Interface
 export interface UserProfile {
   age: number;
   gender: 'male' | 'female' | 'other';
@@ -39,11 +32,53 @@ export interface UserProfile {
   dailyTargets: DailyTargets;
 }
 
-// NEW: Daily Targets Interface
 export interface DailyTargets {
   calories: number;
   protein: number;
   fat: number;
   isCustom: boolean; 
   lastUpdatedBy: 'ai' | 'user';
+}
+
+export interface FavoriteFood {
+  name: string;
+  content: string;
+  useCount: number;
+  lastUsed: string;
+  tags?: string[];
+}
+
+export interface Exercise {
+  id: string;
+  type: string;
+  duration: number; // in minutes
+  caloriesBurned: number;
+  notes: string;
+  timestamp: string;
+}
+
+export interface ExerciseLog {
+  date: string; // YYYY-MM-DD
+  exercises: Exercise[];
+  totalCaloriesBurned: number;
+}
+
+export interface DailySummaryEntry {
+  date: string;
+  totals: {
+    calories: number;
+    protein: number;
+    fat: number;
+  };
+  targets: {
+    calories: number;
+    protein: number;
+    fat: number;
+  };
+  mealsLogged: number;
+  goalsMet: {
+    calories: boolean;
+    protein: boolean;
+    fat: boolean;
+  };
 }
