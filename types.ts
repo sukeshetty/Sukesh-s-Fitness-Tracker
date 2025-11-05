@@ -9,11 +9,14 @@ export interface Ingredient {
   protein: number | string;
   fat: number | string;
   notes: string;
+  isHealthy: boolean;
 }
 
 export interface ChatMessage {
+  id: string;
   role: MessageRole;
   content: string;
+  imageUrl?: string;
   nutritionData?: Ingredient[];
   timestamp: string;
 }

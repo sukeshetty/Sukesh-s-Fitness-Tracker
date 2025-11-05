@@ -18,8 +18,8 @@ interface DailySummaryViewProps {
 
 const Stat: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
   <div>
-    <p className="text-sm font-medium text-slate-400 uppercase tracking-wider">{label}</p>
-    <p className="text-2xl font-bold text-slate-100">{value}</p>
+    <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider">{label}</p>
+    <p className="text-2xl font-bold text-zinc-100">{value}</p>
   </div>
 );
 
@@ -56,18 +56,18 @@ const DailySummaryView: React.FC<DailySummaryViewProps> = ({ messages, isOpen, o
 
   return (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-300"
       onClick={onClose}
     >
       <div 
-        className="bg-slate-800 rounded-2xl ring-1 ring-slate-700 w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl"
+        className="bg-black/50 backdrop-blur-xl rounded-2xl ring-1 ring-white/10 w-full max-w-2xl max-h-[80vh] flex flex-col shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <header className="flex items-center justify-between p-4 border-b border-slate-700">
-          <h2 className="text-xl font-bold text-slate-100">Daily Summaries</h2>
+        <header className="flex items-center justify-between p-4 border-b border-white/10">
+          <h2 className="text-xl font-bold text-zinc-100">Daily Summaries</h2>
           <button 
             onClick={onClose}
-            className="p-1 text-slate-400 hover:text-cyan-300 transition-colors"
+            className="p-1 text-zinc-400 hover:text-zinc-100 transition-colors"
             aria-label="Close summary view"
           >
             <CloseIcon className="w-6 h-6" />
@@ -75,13 +75,13 @@ const DailySummaryView: React.FC<DailySummaryViewProps> = ({ messages, isOpen, o
         </header>
         <div className="overflow-y-auto p-4 space-y-4">
           {sortedDates.length === 0 ? (
-            <p className="text-slate-400 text-center py-8">No meal logs with nutritional data found.</p>
+            <p className="text-zinc-400 text-center py-8">No meal logs with nutritional data found.</p>
           ) : (
             sortedDates.map(date => {
               const summary = dailySummaries[date];
               return (
-                <div key={date} className="bg-slate-900/50 p-4 rounded-xl ring-1 ring-slate-700">
-                  <h3 className="font-bold text-cyan-400 text-lg mb-3">
+                <div key={date} className="bg-white/5 backdrop-blur-lg p-4 rounded-xl ring-1 ring-white/10">
+                  <h3 className="font-bold text-blue-400 text-lg mb-3">
                     {date}
                   </h3>
                   <div className="grid grid-cols-3 gap-4 text-center">
