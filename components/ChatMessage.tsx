@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+
+import React, { useState, useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
-import { ChatMessage, MessageRole } from '../types';
+import { ChatMessage, MessageRole, DailyTargets } from '../types';
 import { UserIcon, GeminiStarIcon, BookmarkIcon, EditIcon } from './Icons';
 import NutritionCard from './NutritionCard';
 import TotalNutritionCard from './TotalNutritionCard';
@@ -21,6 +22,7 @@ interface ChatMessageProps {
   isCurrentlySavingEdit: boolean; // Is this specific message's edit being saved?
   isAnalyzedModelMessage: boolean;
   messagesForSummary: ChatMessage[];
+  dailyTargets?: DailyTargets;
 }
 
 const InlineEditForm: React.FC<{
@@ -85,7 +87,7 @@ const InlineEditForm: React.FC<{
 };
 
 
-const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onSaveMeal, isEditing, onStartEdit, onCancelEdit, onEditMessage, isProcessing, isCurrentlySavingEdit, isAnalyzedModelMessage, messagesForSummary }) => {
+const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onSaveMeal, isEditing, onStartEdit, onCancelEdit, onEditMessage, isProcessing, isCurrentlySavingEdit, isAnalyzedModelMessage, messagesForSummary, dailyTargets }) => {
   const isUser = message.role === MessageRole.USER;
 
   const rawMarkup = marked.parse(message.content, { breaks: true, gfm: true });
@@ -144,6 +146,7 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, onS
                     <div className="w-full mt-4">
                         <DailySummaryCard 
                           messages={messagesForSummary.filter(m => new Date(m.timestamp) <= new Date(message.timestamp))}
+                          dailyTargets={dailyTargets}
                         />
                     </div>
                 )}

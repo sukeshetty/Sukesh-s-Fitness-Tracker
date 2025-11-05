@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, BookmarkIcon, TrashIcon, PaperclipIcon } from './Icons';
 import Spinner from './Spinner';
@@ -52,9 +53,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, handler: (file: File) => void) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-        handler(e.target.files[0]);
+        onImageForAnalysis(e.target.files[0]);
     }
     e.target.value = ''; // Reset file input
   }
@@ -97,7 +98,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
           disabled={isSubmitting}
         />
         <div className="flex items-end flex-shrink-0">
-            <input type="file" accept="image/*" ref={analysisFileRef} onChange={(e) => handleFileChange(e, onImageForAnalysis)} className="hidden" />
+            <input type="file" accept="image/*" ref={analysisFileRef} onChange={handleFileChange} className="hidden" />
             
             <button type="button" onClick={() => analysisFileRef.current?.click()} className="text-zinc-300 hover:text-zinc-100 p-3 rounded-full hover:bg-white/10 transition-colors" aria-label="Upload photo for analysis" >
                 <PaperclipIcon className="w-5 h-5" />

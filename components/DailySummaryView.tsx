@@ -1,5 +1,6 @@
+
 import React, { useMemo } from 'react';
-import { ChatMessage, MessageRole } from '../types';
+import { ChatMessage, MessageRole, DailyTargets } from '../types';
 import { CloseIcon } from './Icons';
 import AnimatedNumber from './AnimatedNumber';
 
@@ -15,33 +16,28 @@ interface DailySummaryViewProps {
   messages: ChatMessage[];
   isOpen: boolean;
   onClose: () => void;
+  dailyTargets?: DailyTargets;
 }
 
-const Stat: React.FC<{ label: string; value: number; suffix?: string }> = ({ label, value, suffix = '' }) => (
-  <div>
-    <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider">{label}</p>
-    <p className="text-2xl font-bold text-zinc-100">
-      <AnimatedNumber value={value} duration={600} suffix={suffix} />
-    </p>
-  </div>
-);
+const Stat: React.FC<{ label: string; value: number; target: number; suffix?: string }> = ({ label, value, target, suffix = '' }) => (
+    <div className="bg-white/5 rounded-lg p-3">
+      <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-lg font-bold text-zinc-100">
+        <AnimatedNumber value={value} duration={600} suffix={suffix} /> 
+        <span className="text-sm font-normal text-zinc-400"> / {target}{suffix}</span>
+      </p>
+    </div>
+  );
 
-const DailySummaryView: React.FC<DailySummaryViewProps> = ({ messages, isOpen, onClose }) => {
+const DailySummaryView: React.FC<DailySummaryViewProps> = ({ messages, isOpen, onClose, dailyTargets }) => {
   const dailySummaries = useMemo<DailySummary>(() => {
     const summaries: DailySummary = {};
-
     messages.forEach((msg) => {
       if (msg.role === MessageRole.MODEL && msg.nutritionData) {
-        const date = new Date(msg.timestamp).toLocaleDateString(undefined, {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        });
-
+        const date = new Date(msg.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
         if (!summaries[date]) {
           summaries[date] = { calories: 0, protein: 0, fat: 0 };
         }
-
         msg.nutritionData.forEach((item) => {
           summaries[date].calories += Number(item.calories) || 0;
           summaries[date].protein += Number(item.protein) || 0;
@@ -49,7 +45,6 @@ const DailySummaryView: React.FC<DailySummaryViewProps> = ({ messages, isOpen, o
         });
       }
     });
-
     return summaries;
   }, [messages]);
   
@@ -68,11 +63,7 @@ const DailySummaryView: React.FC<DailySummaryViewProps> = ({ messages, isOpen, o
       >
         <header className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-xl font-bold text-zinc-100">Daily Summaries</h2>
-          <button 
-            onClick={onClose}
-            className="p-1 text-zinc-400 hover:text-zinc-100 transition-colors"
-            aria-label="Close summary view"
-          >
+          <button onClick={onClose} className="p-1 text-zinc-400 hover:text-zinc-100 transition-colors" aria-label="Close summary view">
             <CloseIcon className="w-6 h-6" />
           </button>
         </header>
@@ -84,14 +75,16 @@ const DailySummaryView: React.FC<DailySummaryViewProps> = ({ messages, isOpen, o
               const summary = dailySummaries[date];
               return (
                 <div key={date} className="bg-white/5 backdrop-blur-lg p-4 rounded-xl ring-1 ring-white/10">
-                  <h3 className="font-bold text-blue-400 text-lg mb-3">
-                    {date}
-                  </h3>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <Stat label="Calories" value={Math.round(summary.calories)} />
-                    <Stat label="Protein" value={Math.round(summary.protein)} suffix="g" />
-                    <Stat label="Fat" value={Math.round(summary.fat)} suffix="g" />
-                  </div>
+                  <h3 className="font-bold text-blue-400 text-lg mb-3">{date}</h3>
+                  {dailyTargets ? (
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <Stat label="Calories" value={Math.round(summary.calories)} target={dailyTargets.calories} />
+                      <Stat label="Protein" value={Math.round(summary.protein)} target={dailyTargets.protein} suffix="g" />
+                      <Stat label="Fat" value={Math.round(summary.fat)} target={dailyTargets.fat} suffix="g" />
+                    </div>
+                  ) : (
+                     <p className="text-center text-zinc-400 text-sm py-4">Set your profile to track against daily goals.</p>
+                  )}
                 </div>
               );
             })

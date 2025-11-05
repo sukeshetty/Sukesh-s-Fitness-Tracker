@@ -1,14 +1,16 @@
+
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
-import { ChatMessage, MessageRole, Ingredient, SavedMeal } from './types';
+import { ChatMessage, MessageRole, Ingredient, SavedMeal, UserProfile, DailyTargets } from './types';
 import ChatInput from './components/ChatInput';
 import ChatMessageBubble from './components/ChatMessage';
 import DailySummaryView from './components/DailySummaryView';
 import Greeting from './components/Greeting';
-import { ChartBarIcon } from './components/Icons';
+import { ChartBarIcon, UserIcon } from './components/Icons';
 import DuplicateWarningModal from './components/DuplicateWarningModal';
+import ProfilePage from './components/ProfilePage';
 
-const SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
+const BASE_SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
 
 When the user describes a meal, your response must begin with a JSON object with a nutritional breakdown. This JSON object must be inside a \`\`\`json code block. This JSON + conversational feedback format should be used whenever a meal is described, not just for the first message.
 
@@ -16,9 +18,10 @@ The JSON structure is an array of objects, each with keys: "ingredient", "calori
 The "isHealthy" key must be a boolean value (true for healthy, false for unhealthy).
 
 - For healthy foods, the 'notes' should be positive and informative.
-- For unhealthy foods, the 'notes' must be a single, witty, sarcastic one-liner.
+- For unhealthy foods, the 'notes' should be a single, witty, sarcastic one-liner.
+- **CRITICAL**: If a food item conflicts with the user's health conditions (e.g., high sugar for diabetics, high sodium for hypertension), mark it as "isHealthy": false and include a specific health warning in the notes.
 
-Example JSON:
+Example JSON for a user with diabetes:
 \`\`\`json
 [
   {
@@ -26,33 +29,22 @@ Example JSON:
     "calories": 260,
     "protein": 3,
     "fat": 14,
-    "notes": "The fastest way to get a sugar rush and a subsequent nap.",
+    "notes": "⚠️ Contains high sugar, which can significantly impact blood glucose. Best to avoid.",
     "isHealthy": false
-  },
-  {
-    "ingredient": "Greek Yogurt",
-    "calories": 100,
-    "protein": 18,
-    "fat": 0,
-    "notes": "Excellent source of protein to keep you full.",
-    "isHealthy": true
   }
 ]
 \`\`\`
 
 Following the JSON block, provide conversational feedback in Markdown.
 - If the meal is generally healthy, be encouraging.
-- If the meal contains unhealthy items, provide a concise suggestion for improvement (no more than 2 lines) after your comment.
+- **If any food items conflict with the user's health conditions, provide a specific warning as the first line of your feedback.** (e.g., "⚠️ Warning: This meal contains high sugar which may affect your diabetes. Consider switching to...")
+- If the meal contains unhealthy items (without a specific health warning), provide a concise suggestion for improvement (no more than 2 lines).
 - Keep all conversational feedback brief, within a 4-5 line maximum.
 
-Example conversational feedback for the donut:
-"That donut is quite the indulgence. For a breakfast with more staying power, you could try a whole-wheat bagel with a bit of cream cheese next time."
-
-For all subsequent messages, continue the conversation in this helpful but witty tone.
-
-Do not provide medical advice. Just your expert nutritional judgment.`;
+Do not provide medical advice. Just your expert nutritional judgment with health-aware guidance.`;
 
 const SAVED_MEALS_KEY = 'gemini-food-copilot-saved-meals';
+const USER_PROFILE_KEY = 'gemini-food-copilot-user-profile';
 
 const generateUniqueId = () => Date.now().toString(36) + Math.random().toString(36).substring(2);
 
@@ -74,7 +66,6 @@ const parseNutritionResponse = (text: string): { nutritionData?: Ingredient[]; r
     if (match && match[1]) {
         try {
             const jsonData = JSON.parse(match[1]);
-            // Ensure all numeric values are actually numbers
             const normalizedData = jsonData.map((item: any) => ({
                 ...item,
                 calories: Number(item.calories) || 0,
@@ -92,7 +83,6 @@ const parseNutritionResponse = (text: string): { nutritionData?: Ingredient[]; r
     return { nutritionData: undefined, remainingText: text };
 };
 
-// Levenshtein distance algorithm for similarity checking
 const calculateSimilarity = (str1: string, str2: string): number => {
   const longer = str1.length > str2.length ? str1 : str2;
   const shorter = str1.length > str2.length ? str2 : str1;
@@ -134,110 +124,108 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isSummaryOpen, setIsSummaryOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  
   const [duplicateWarning, setDuplicateWarning] = useState<{
     show: boolean;
     content: string;
     minutesAgo: number;
     pendingMessage: { userInput: string; imageUrl?: string } | null;
-  }>({
-    show: false,
-    content: '',
-    minutesAgo: 0,
-    pendingMessage: null,
-  });
+  }>({ show: false, content: '', minutesAgo: 0, pendingMessage: null });
+  
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef(messages);
 
-  useEffect(() => {
-    messagesRef.current = messages;
-  }, [messages]);
+  useEffect(() => { messagesRef.current = messages; }, [messages]);
 
+  // Load saved meals and profile from local storage
   useEffect(() => {
     try {
-        const saved = localStorage.getItem(SAVED_MEALS_KEY);
-        if (saved) {
-            setSavedMeals(JSON.parse(saved));
-        }
+      const saved = localStorage.getItem(SAVED_MEALS_KEY);
+      if (saved) setSavedMeals(JSON.parse(saved));
+      
+      const profileJson = localStorage.getItem(USER_PROFILE_KEY);
+      if (profileJson) {
+        setUserProfile(JSON.parse(profileJson));
+      } else {
+        // If no profile, open the modal to prompt the user
+        setIsProfileOpen(true);
+      }
     } catch (error) {
-        console.error("Could not load saved meals:", error);
+      console.error("Could not load data from localStorage:", error);
     }
   }, []);
 
+  // Save meals and profile to local storage
   useEffect(() => {
     try {
-        localStorage.setItem(SAVED_MEALS_KEY, JSON.stringify(savedMeals));
+      localStorage.setItem(SAVED_MEALS_KEY, JSON.stringify(savedMeals));
     } catch (error) {
-        console.error("Could not save meals:", error);
-        setError("Failed to save meals. Your browser storage might be full.");
+      console.error("Could not save meals:", error);
+      setError("Failed to save meals. Your browser storage might be full.");
     }
   }, [savedMeals]);
   
+  const handleSaveProfile = useCallback((profile: UserProfile) => {
+    setUserProfile(profile);
+    try {
+        localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+    } catch (error) {
+        console.error("Could not save profile:", error);
+        setError("Failed to save profile. Your browser storage might be full.");
+    }
+    setIsProfileOpen(false);
+  }, []);
+
   // Cleanup blob URLs on unmount to prevent memory leaks
   useEffect(() => {
-    return () => {
-      messages.forEach(msg => {
-        if (msg.imageUrl?.startsWith('blob:')) {
-          URL.revokeObjectURL(msg.imageUrl);
-        }
-      });
-    };
+    return () => { messages.forEach(msg => { if (msg.imageUrl?.startsWith('blob:')) URL.revokeObjectURL(msg.imageUrl); }); };
   }, [messages]);
 
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    if (!editingMessageId) {
-        scrollToBottom();
+  const scrollToBottom = () => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); };
+  useEffect(() => { if (!editingMessageId) scrollToBottom(); }, [messages, editingMessageId]);
+  
+  const getEnhancedSystemInstruction = useCallback(() => {
+    if (!userProfile) return BASE_SYSTEM_INSTRUCTION;
+    let instruction = BASE_SYSTEM_INSTRUCTION;
+    if (userProfile.healthConditions.length > 0) {
+      instruction += `\n\nUSER HEALTH CONDITIONS: ${userProfile.healthConditions.join(', ')}.`;
+      instruction += `\nAlways consider these conditions when evaluating foods and provide warnings for incompatible items.`;
     }
-  }, [messages, editingMessageId]);
+    instruction += `\n\nUSER DAILY TARGETS: ${userProfile.dailyTargets.calories} calories, ${userProfile.dailyTargets.protein}g protein, ${userProfile.dailyTargets.fat}g fat.`;
+    instruction += `\nProvide context on how each meal fits into their daily targets.`;
+    return instruction;
+  }, [userProfile]);
+
 
   useEffect(() => {
     const initializeChat = () => {
       try {
-        if (!process.env.API_KEY) {
-          throw new Error("API_KEY environment variable not set.");
-        }
+        if (!process.env.API_KEY) throw new Error("API_KEY environment variable not set.");
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const chat = ai.chats.create({
           model: 'gemini-2.5-pro',
-          config: {
-            systemInstruction: SYSTEM_INSTRUCTION,
-          },
+          config: { systemInstruction: getEnhancedSystemInstruction() },
         });
         chatSessionRef.current = chat;
       } catch (e) {
-        if (e instanceof Error) {
-          setError(`Initialization failed: ${e.message}`);
-        } else {
-          setError("An unknown error occurred during initialization.");
-        }
+        setError(e instanceof Error ? `Initialization failed: ${e.message}` : "An unknown error occurred during initialization.");
         console.error(e);
       }
     };
     initializeChat();
-  }, []);
+  }, [userProfile, getEnhancedSystemInstruction]);
   
-  const streamModelResponse = async (
-    message: string,
-    onChunk: (text: string) => void,
-    onComplete: (nutritionData?: Ingredient[], remainingText?: string) => void
-  ) => {
-    if (!chatSessionRef.current) {
-      throw new Error("Chat session not initialized.");
-    }
-    
+  const streamModelResponse = async (message: string, onChunk: (text: string) => void, onComplete: (nutritionData?: Ingredient[], remainingText?: string) => void) => {
+    if (!chatSessionRef.current) throw new Error("Chat session not initialized.");
     const stream = await chatSessionRef.current.sendMessageStream({ message });
     let modelResponse = '';
-    
     for await (const chunk of stream) {
       modelResponse += chunk.text;
       onChunk(modelResponse);
     }
-    
     const { nutritionData, remainingText } = parseNutritionResponse(modelResponse);
     onComplete(nutritionData, remainingText);
   };
@@ -246,32 +234,15 @@ const App: React.FC = () => {
     setError(null);
     setLoadingState({ type: 'sending' });
   
-    const userMessage: ChatMessage = {
-      id: generateUniqueId(),
-      role: MessageRole.USER,
-      content: userInput,
-      imageUrl,
-      timestamp: new Date().toISOString(),
-    };
-    
-    const modelMessage: ChatMessage = {
-      id: generateUniqueId(),
-      role: MessageRole.MODEL,
-      content: '',
-      timestamp: new Date().toISOString(),
-    };
-
+    const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: userInput, imageUrl, timestamp: new Date().toISOString() };
+    const modelMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.MODEL, content: '', timestamp: new Date().toISOString() };
     setMessages(prev => [...prev, userMessage, modelMessage]);
   
     try {
       await streamModelResponse(
         userInput,
-        (modelResponse) => { // onChunk
-            setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m));
-        },
-        (nutritionData, remainingText) => { // onComplete
-            setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m));
-        }
+        (modelResponse) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m)),
+        (nutritionData, remainingText) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m))
       );
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
@@ -283,72 +254,43 @@ const App: React.FC = () => {
     }
   };
 
-
   const handleSendMessage = useCallback(async (userInput: string, imageUrl?: string) => {
     if (!userInput.trim()) return;
-  
     const normalizedInput = userInput.trim().toLowerCase();
-    
-    // Enhanced duplicate detection
-    const recentTimeThreshold = 5 * 60 * 1000; // 5 minutes in milliseconds
+    const recentTimeThreshold = 5 * 60 * 1000;
     const now = Date.now();
-    
     const duplicateMatches = messagesRef.current.filter((msg) => {
       if (msg.role !== MessageRole.USER) return false;
-      
       const msgTime = new Date(msg.timestamp).getTime();
       const timeDiff = now - msgTime;
       const isRecent = timeDiff < recentTimeThreshold;
-      
-      const isExactMatch = msg.content.trim().toLowerCase() === normalizedInput;
       const isSimilar = calculateSimilarity(msg.content.trim().toLowerCase(), normalizedInput) > 0.85;
-      
-      return (isExactMatch || isSimilar) && isRecent && !msg.imageUrl && !imageUrl;
+      return isSimilar && isRecent && !msg.imageUrl && !imageUrl;
     });
     
     if (duplicateMatches.length > 0) {
       const lastDuplicate = duplicateMatches[duplicateMatches.length - 1];
       const minutesAgo = Math.round((now - new Date(lastDuplicate.timestamp).getTime()) / 60000);
-      
-      setDuplicateWarning({
-        show: true,
-        content: lastDuplicate.content,
-        minutesAgo,
-        pendingMessage: { userInput, imageUrl },
-      });
+      setDuplicateWarning({ show: true, content: lastDuplicate.content, minutesAgo, pendingMessage: { userInput, imageUrl } });
       return;
     }
-
     await handleSendMessageInternal(userInput, imageUrl);
   }, []);
   
   const handleConfirmDuplicate = useCallback(async () => {
     const pending = duplicateWarning.pendingMessage;
     setDuplicateWarning({ show: false, content: '', minutesAgo: 0, pendingMessage: null });
-    
-    if (pending) {
-      await handleSendMessageInternal(pending.userInput, pending.imageUrl);
-    }
+    if (pending) await handleSendMessageInternal(pending.userInput, pending.imageUrl);
   }, [duplicateWarning]);
 
-  const handleCancelDuplicate = useCallback(() => {
-    setDuplicateWarning({ show: false, content: '', minutesAgo: 0, pendingMessage: null });
-  }, []);
+  const handleCancelDuplicate = useCallback(() => { setDuplicateWarning({ show: false, content: '', minutesAgo: 0, pendingMessage: null }); }, []);
 
-  
   const handleImageForAnalysis = async (file: File) => {
     if (loadingState.type !== 'idle') return;
     setLoadingState({ type: 'sending' });
     setError(null);
-
     const imageUrl = URL.createObjectURL(file);
-    const userMessage: ChatMessage = {
-        id: generateUniqueId(),
-        role: MessageRole.USER,
-        content: "Analyzing image...",
-        imageUrl,
-        timestamp: new Date().toISOString(),
-    };
+    const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: "Analyzing image...", imageUrl, timestamp: new Date().toISOString() };
     setMessages(prev => [...prev, userMessage]);
 
     try {
@@ -356,20 +298,11 @@ const App: React.FC = () => {
         const imagePart = await fileToGenerativePart(file);
         const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: {
-                parts: [
-                    { text: "Describe the food items in this image for a nutrition log. Be descriptive and concise." },
-                    imagePart,
-                ],
-            },
+            contents: { parts: [ { text: "Describe the food items in this image for a nutrition log. Be descriptive and concise." }, imagePart ] },
         });
-
         const foodDescription = response.text;
-        
         setMessages(prev => prev.map(msg => msg.id === userMessage.id ? { ...msg, content: foodDescription } : msg));
-        
-        await handleSendMessage(foodDescription, imageUrl); // Pass imageUrl to check for duplicates correctly
-
+        await handleSendMessage(foodDescription);
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
         setError(`Image analysis failed: ${errorMessage}`);
@@ -381,37 +314,29 @@ const App: React.FC = () => {
   
   const handleEditMessage = useCallback(async (messageId: string, newContent: string) => {
     if (!newContent.trim()) return;
-
     setError(null);
     setLoadingState({ type: 'editing', id: messageId });
     setEditingMessageId(null);
 
     const originalMessages = messagesRef.current;
     const userMessageIndex = originalMessages.findIndex(msg => msg.id === messageId);
-    
     if (userMessageIndex === -1) {
         setLoadingState({ type: 'idle' });
         setError("Could not find the message to edit.");
         return;
     }
-    
-    const modelMessageIndex = userMessageIndex + 1;
-    const modelMessage = originalMessages[modelMessageIndex];
+    const modelMessage = originalMessages[userMessageIndex + 1];
 
     const updatedMessages = [...originalMessages];
     updatedMessages[userMessageIndex] = { ...updatedMessages[userMessageIndex], content: newContent, timestamp: new Date().toISOString() };
-    updatedMessages[modelMessageIndex] = { ...modelMessage, content: '', nutritionData: undefined };
+    updatedMessages[userMessageIndex + 1] = { ...modelMessage, content: '', nutritionData: undefined };
     setMessages(updatedMessages);
 
     try {
       await streamModelResponse(
         newContent,
-        (modelResponse) => { // onChunk
-            setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m));
-        },
-        (nutritionData, remainingText) => { // onComplete
-            setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m));
-        }
+        (modelResponse) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m)),
+        (nutritionData, remainingText) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m))
       );
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
@@ -423,16 +348,13 @@ const App: React.FC = () => {
     }
   }, []);
 
-
   const handleSaveMeal = useCallback((mealContent: string) => {
     const defaultName = mealContent.length > 25 ? `${mealContent.substring(0, 25)}...` : mealContent;
     const mealName = prompt("Enter a name for this meal:", defaultName);
     if (mealName) {
         const newMeal: SavedMeal = { name: mealName.trim(), content: mealContent };
         if (savedMeals.some(meal => meal.name.toLowerCase() === newMeal.name.toLowerCase())) {
-            if (!confirm(`A meal named "${newMeal.name}" already exists. Overwrite it?`)) {
-                return;
-            }
+            if (!confirm(`A meal named "${newMeal.name}" already exists. Overwrite it?`)) return;
             setSavedMeals(prev => prev.map(meal => meal.name.toLowerCase() === newMeal.name.toLowerCase() ? newMeal : meal));
         } else {
             setSavedMeals(prev => [...prev, newMeal]);
@@ -451,42 +373,24 @@ const App: React.FC = () => {
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
-
-    if (date.toDateString() === today.toDateString()) {
-      return 'Today';
-    }
-    if (date.toDateString() === yesterday.toDateString()) {
-      return 'Yesterday';
-    }
-    return date.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
+    if (date.toDateString() === today.toDateString()) return 'Today';
+    if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
   };
 
   const groupedMessages = useMemo(() => {
     if (messages.length === 0) return [];
-    
     const groups: { [date: string]: ChatMessage[] } = {};
-
     messages.forEach(msg => {
         if (!msg.timestamp) return;
         const dateKey = new Date(msg.timestamp).toDateString();
-        if (!groups[dateKey]) {
-            groups[dateKey] = [];
-        }
+        if (!groups[dateKey]) groups[dateKey] = [];
         groups[dateKey].push(msg);
     });
-
     return Object.keys(groups)
         .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
-        .map(date => ({
-            date,
-            messagesForDay: groups[date],
-        }));
+        .map(date => ({ date, messagesForDay: groups[date] }));
   }, [messages]);
-
 
   return (
     <div className="flex flex-col h-screen bg-transparent text-white font-sans">
@@ -494,13 +398,14 @@ const App: React.FC = () => {
         <div className="flex items-center gap-3">
             <h1 className="text-xl font-medium text-zinc-200">SukeshFIT</h1>
         </div>
-        <button 
-            onClick={() => setIsSummaryOpen(true)}
-            className="p-2 text-zinc-400 hover:text-zinc-100 transition-colors"
-            aria-label="Show daily summary"
-        >
-            <ChartBarIcon className="w-6 h-6"/>
-        </button>
+        <div className="flex items-center gap-2">
+            <button onClick={() => setIsSummaryOpen(true)} className="p-2 text-zinc-400 hover:text-zinc-100 transition-colors" aria-label="Show daily summary" >
+                <ChartBarIcon className="w-6 h-6"/>
+            </button>
+            <button onClick={() => setIsProfileOpen(true)} className="p-2 text-zinc-400 hover:text-zinc-100 transition-colors" aria-label="Open Profile" >
+                <UserIcon className="w-6 h-6"/>
+            </button>
+        </div>
       </header>
       
       <div className="flex-1 flex flex-col w-full">
@@ -515,66 +420,63 @@ const App: React.FC = () => {
                         <div className="flex justify-center my-4">
                             <span className="bg-zinc-800 text-xs font-semibold px-3 py-1 rounded-full text-zinc-400">{getRelativeDate(date)}</span>
                         </div>
-                        
                         {messagesForDay.map((msg) => {
                             const globalIndex = messages.findIndex(m => m.id === msg.id);
-                            const nextMessage = messages[globalIndex + 1];
-                            const isMealLog = msg.role === MessageRole.USER && nextMessage?.role === MessageRole.MODEL && !!nextMessage.nutritionData;
+                            const isMealLog = msg.role === MessageRole.USER && globalIndex + 1 < messages.length && messages[globalIndex + 1].role === MessageRole.MODEL && !!messages[globalIndex + 1].nutritionData;
                             
-                            const isAnalyzedModelMessage = msg.role === MessageRole.MODEL && msg.nutritionData && msg.nutritionData.length > 0;
-                            const isUser = msg.role === MessageRole.USER;
-                            const isSomethingLoading = loadingState.type !== 'idle';
-                            const isThisMessageBeingEditedAndSaved = loadingState.type === 'editing' && loadingState.id === msg.id;
-
                             return (
-                                <div key={msg.id} className={`flex w-full ${isUser ? 'justify-end' : 'justify-start'}`}>
-                                    <ChatMessageBubble 
-                                    message={msg}
-                                    isMealLog={isMealLog}
-                                    onSaveMeal={handleSaveMeal}
-                                    isEditing={editingMessageId === msg.id}
-                                    onStartEdit={setEditingMessageId}
-                                    onCancelEdit={() => setEditingMessageId(null)}
-                                    onEditMessage={handleEditMessage}
-                                    isProcessing={isSomethingLoading}
-                                    isCurrentlySavingEdit={isThisMessageBeingEditedAndSaved}
-                                    isAnalyzedModelMessage={isAnalyzedModelMessage}
-                                    messagesForSummary={messagesForDay}
+                                <div key={msg.id} className={`flex w-full ${msg.role === MessageRole.USER ? 'justify-end' : 'justify-start'}`}>
+                                    <ChatMessageBubble
+                                        message={msg}
+                                        isMealLog={isMealLog}
+                                        onSaveMeal={handleSaveMeal}
+                                        isEditing={editingMessageId === msg.id}
+                                        onStartEdit={setEditingMessageId}
+                                        onCancelEdit={() => setEditingMessageId(null)}
+                                        onEditMessage={handleEditMessage}
+                                        isProcessing={loadingState.type !== 'idle'}
+                                        isCurrentlySavingEdit={loadingState.type === 'editing' && loadingState.id === msg.id}
+                                        isAnalyzedModelMessage={msg.role === MessageRole.MODEL && !!msg.nutritionData && msg.nutritionData.length > 0}
+                                        messagesForSummary={messages}
+                                        dailyTargets={userProfile?.dailyTargets}
                                     />
                                 </div>
                             );
                         })}
                     </div>
                 ))}
+                <div ref={messagesEndRef} />
                 </>
               )}
-                {error && (
-                    <div className="bg-red-500/20 text-red-300 p-3 rounded-lg max-w-4xl mx-auto w-full text-center">
-                        <p><strong>Error:</strong> {error}</p>
-                    </div>
-                )}
-                <div ref={messagesEndRef} />
             </div>
         </main>
     
         <footer className="w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[#0c0c0e] via-[#0c0c0e]/90 to-transparent">
-             <div className="max-w-4xl mx-auto w-full">
-                <ChatInput 
-                  onSendMessage={handleSendMessage} 
-                  isSending={loadingState.type === 'sending'}
-                  isSubmitting={loadingState.type !== 'idle'}
-                  savedMeals={savedMeals}
-                  onDeleteSavedMeal={handleDeleteSavedMeal}
-                  onImageForAnalysis={handleImageForAnalysis}
+            <div className="max-w-4xl mx-auto">
+                {error && (
+                    <div className="bg-red-500/20 text-red-300 p-3 rounded-lg text-sm mb-2 text-center">
+                        {error}
+                    </div>
+                )}
+                <ChatInput
+                    onSendMessage={handleSendMessage}
+                    isSending={loadingState.type === 'sending'}
+                    isSubmitting={loadingState.type !== 'idle'}
+                    savedMeals={savedMeals}
+                    onDeleteSavedMeal={handleDeleteSavedMeal}
+                    onImageForAnalysis={handleImageForAnalysis}
                 />
-             </div>
+            </div>
         </footer>
       </div>
-      <DailySummaryView 
-        messages={messages} 
-        isOpen={isSummaryOpen} 
-        onClose={() => setIsSummaryOpen(false)} 
+
+      <DailySummaryView
+        isOpen={isSummaryOpen}
+        onClose={() => setIsSummaryOpen(false)}
+        messages={messages}
+        dailyTargets={userProfile?.dailyTargets}
       />
+
       <DuplicateWarningModal
         isOpen={duplicateWarning.show}
         duplicateContent={duplicateWarning.content}
@@ -582,6 +484,15 @@ const App: React.FC = () => {
         onConfirm={handleConfirmDuplicate}
         onCancel={handleCancelDuplicate}
       />
+      
+      {isProfileOpen && (
+        <ProfilePage
+            isOpen={isProfileOpen}
+            onClose={() => setIsProfileOpen(false)}
+            userProfile={userProfile}
+            onSave={handleSaveProfile}
+        />
+      )}
     </div>
   );
 };

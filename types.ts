@@ -1,3 +1,4 @@
+
 export enum MessageRole {
   USER = 'user',
   MODEL = 'model',
@@ -24,4 +25,25 @@ export interface ChatMessage {
 export interface SavedMeal {
   name: string;
   content: string;
+}
+
+// NEW: User Profile Interface
+export interface UserProfile {
+  age: number;
+  gender: 'male' | 'female' | 'other';
+  weight: number; // in kg
+  height: number; // in cm
+  activityLevel: 'sedentary' | 'light' | 'moderate' | 'active' | 'very_active';
+  goal: 'lose_weight' | 'maintain' | 'gain_muscle';
+  healthConditions: string[];
+  dailyTargets: DailyTargets;
+}
+
+// NEW: Daily Targets Interface
+export interface DailyTargets {
+  calories: number;
+  protein: number;
+  fat: number;
+  isCustom: boolean; 
+  lastUpdatedBy: 'ai' | 'user';
 }
