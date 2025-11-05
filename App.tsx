@@ -5,8 +5,7 @@ import ChatInput from './components/ChatInput';
 import ChatMessageBubble from './components/ChatMessage';
 import DailySummaryView from './components/DailySummaryView';
 import Greeting from './components/Greeting';
-import { GeminiStarIcon, ChartBarIcon } from './components/Icons';
-import VideoGenerator from './components/VideoGenerator';
+import { ChartBarIcon } from './components/Icons';
 
 const SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
 
@@ -74,8 +73,15 @@ const parseNutritionResponse = (text: string): { nutritionData?: Ingredient[]; r
     if (match && match[1]) {
         try {
             const jsonData = JSON.parse(match[1]);
+            // Ensure all numeric values are actually numbers
+            const normalizedData = jsonData.map((item: any) => ({
+                ...item,
+                calories: Number(item.calories) || 0,
+                protein: Number(item.protein) || 0,
+                fat: Number(item.fat) || 0,
+            }));
             const remainingText = text.replace(jsonRegex, '').trim();
-            return { nutritionData: jsonData, remainingText };
+            return { nutritionData: normalizedData, remainingText };
         } catch (error) {
             console.error("Failed to parse nutrition JSON:", error);
             return { nutritionData: undefined, remainingText: text };
@@ -96,9 +102,11 @@ const App: React.FC = () => {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  
-  const [selectedImageForVideo, setSelectedImageForVideo] = useState<File | null>(null);
-  const [showVideoGenerator, setShowVideoGenerator] = useState(false);
+  const messagesRef = useRef(messages);
+
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   useEffect(() => {
     try {
@@ -116,8 +124,21 @@ const App: React.FC = () => {
         localStorage.setItem(SAVED_MEALS_KEY, JSON.stringify(savedMeals));
     } catch (error) {
         console.error("Could not save meals:", error);
+        setError("Failed to save meals. Your browser storage might be full.");
     }
   }, [savedMeals]);
+  
+  // Cleanup blob URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      messages.forEach(msg => {
+        if (msg.imageUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(msg.imageUrl);
+        }
+      });
+    };
+  }, [messages]);
+
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -154,13 +175,36 @@ const App: React.FC = () => {
     };
     initializeChat();
   }, []);
+  
+  const streamModelResponse = async (
+    message: string,
+    onChunk: (text: string) => void,
+    onComplete: (nutritionData?: Ingredient[], remainingText?: string) => void
+  ) => {
+    if (!chatSessionRef.current) {
+      throw new Error("Chat session not initialized.");
+    }
+    
+    const stream = await chatSessionRef.current.sendMessageStream({ message });
+    let modelResponse = '';
+    
+    for await (const chunk of stream) {
+      modelResponse += chunk.text;
+      onChunk(modelResponse);
+    }
+    
+    const { nutritionData, remainingText } = parseNutritionResponse(modelResponse);
+    onComplete(nutritionData, remainingText);
+  };
 
   const handleSendMessage = useCallback(async (userInput: string, imageUrl?: string) => {
     if (!userInput.trim()) return;
   
     const normalizedInput = userInput.trim().toLowerCase();
-    const isDuplicate = messages.some(
-      (msg) => msg.role === MessageRole.USER && msg.content.trim().toLowerCase() === normalizedInput && !msg.imageUrl
+    const isDuplicate = messagesRef.current.some(
+      (msg) => msg.role === MessageRole.USER && 
+               msg.content.trim().toLowerCase() === normalizedInput &&
+               !msg.imageUrl && !imageUrl
     );
   
     if (isDuplicate) {
@@ -179,52 +223,35 @@ const App: React.FC = () => {
       imageUrl,
       timestamp: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, userMessage]);
+    
+    const modelMessage: ChatMessage = {
+      id: generateUniqueId(),
+      role: MessageRole.MODEL,
+      content: '',
+      timestamp: new Date().toISOString(),
+    };
+
+    setMessages(prev => [...prev, userMessage, modelMessage]);
   
     try {
-      if (!chatSessionRef.current) {
-        throw new Error("Chat session not initialized.");
-      }
-      const stream = await chatSessionRef.current.sendMessageStream({ message: userInput });
-  
-      let modelResponse = '';
-      setMessages(prev => [...prev, { id: generateUniqueId(), role: MessageRole.MODEL, content: '', timestamp: new Date().toISOString() }]);
-  
-      for await (const chunk of stream) {
-        modelResponse += chunk.text;
-        setMessages(prev => {
-          const newMessages = [...prev];
-          const lastMessage = newMessages[newMessages.length - 1];
-          newMessages[newMessages.length - 1] = {
-            ...lastMessage,
-            content: modelResponse,
-          };
-          return newMessages;
-        });
-      }
-  
-      const { nutritionData, remainingText } = parseNutritionResponse(modelResponse);
-  
-      setMessages(prev => {
-        const newMessages = [...prev];
-        const lastMessage = newMessages[newMessages.length - 1];
-        newMessages[newMessages.length - 1] = {
-          ...lastMessage,
-          content: remainingText,
-          nutritionData,
-        };
-        return newMessages;
-      });
-  
+      await streamModelResponse(
+        userInput,
+        (modelResponse) => { // onChunk
+            setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m));
+        },
+        (nutritionData, remainingText) => { // onComplete
+            setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m));
+        }
+      );
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
       setError(`Failed to get response: ${errorMessage}`);
-      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id).slice(0, -1));
+      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id && msg.id !== modelMessage.id));
       console.error(e);
     } finally {
       setLoadingState({ type: 'idle' });
     }
-  }, [messages]);
+  }, []);
   
   const handleImageForAnalysis = async (file: File) => {
     if (loadingState.type !== 'idle') return;
@@ -265,14 +292,8 @@ const App: React.FC = () => {
         setError(`Image analysis failed: ${errorMessage}`);
         setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
         console.error(e);
-    } finally {
         setLoadingState({ type: 'idle' });
     }
-  };
-
-  const handleImageForVideo = (file: File) => {
-    setSelectedImageForVideo(file);
-    setShowVideoGenerator(true);
   };
   
   const handleEditMessage = useCallback(async (messageId: string, newContent: string) => {
@@ -282,59 +303,42 @@ const App: React.FC = () => {
     setLoadingState({ type: 'editing', id: messageId });
     setEditingMessageId(null);
 
-    const userMessageIndex = messages.findIndex(msg => msg.id === messageId);
+    const originalMessages = messagesRef.current;
+    const userMessageIndex = originalMessages.findIndex(msg => msg.id === messageId);
+    
     if (userMessageIndex === -1) {
         setLoadingState({ type: 'idle' });
         setError("Could not find the message to edit.");
         return;
     }
-    const modelMessageIndex = userMessageIndex + 1;
-
-    const updatedMessages = [...messages];
-    updatedMessages[userMessageIndex] = { ...updatedMessages[userMessageIndex], content: newContent, timestamp: new Date().toISOString() };
-    updatedMessages[modelMessageIndex] = { id: generateUniqueId(), role: MessageRole.MODEL, content: '', timestamp: new Date().toISOString() };
     
+    const modelMessageIndex = userMessageIndex + 1;
+    const modelMessage = originalMessages[modelMessageIndex];
+
+    const updatedMessages = [...originalMessages];
+    updatedMessages[userMessageIndex] = { ...updatedMessages[userMessageIndex], content: newContent, timestamp: new Date().toISOString() };
+    updatedMessages[modelMessageIndex] = { ...modelMessage, content: '', nutritionData: undefined };
     setMessages(updatedMessages);
 
     try {
-        if (!chatSessionRef.current) {
-            throw new Error("Chat session not initialized.");
+      await streamModelResponse(
+        newContent,
+        (modelResponse) => { // onChunk
+            setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m));
+        },
+        (nutritionData, remainingText) => { // onComplete
+            setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData } : m));
         }
-        const stream = await chatSessionRef.current.sendMessageStream({ message: newContent });
-
-        let modelResponse = '';
-        for await (const chunk of stream) {
-            modelResponse += chunk.text;
-            setMessages(prev => {
-                const newMessages = [...prev];
-                newMessages[modelMessageIndex] = {
-                    ...newMessages[modelMessageIndex],
-                    content: modelResponse,
-                };
-                return newMessages;
-            });
-        }
-
-        const { nutritionData, remainingText } = parseNutritionResponse(modelResponse);
-        setMessages(prev => {
-            const newMessages = [...prev];
-            newMessages[modelMessageIndex] = {
-                ...newMessages[modelMessageIndex],
-                content: remainingText,
-                nutritionData,
-            };
-            return newMessages;
-        });
-
+      );
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
         setError(`Failed to get response: ${errorMessage}`);
-        setMessages(messages);
+        setMessages(originalMessages);
         console.error(e);
     } finally {
         setLoadingState({ type: 'idle' });
     }
-}, [messages]);
+  }, []);
 
 
   const handleSaveMeal = useCallback((mealContent: string) => {
@@ -479,7 +483,6 @@ const App: React.FC = () => {
                   savedMeals={savedMeals}
                   onDeleteSavedMeal={handleDeleteSavedMeal}
                   onImageForAnalysis={handleImageForAnalysis}
-                  onImageForVideo={handleImageForVideo}
                 />
              </div>
         </footer>
@@ -489,16 +492,6 @@ const App: React.FC = () => {
         isOpen={isSummaryOpen} 
         onClose={() => setIsSummaryOpen(false)} 
       />
-      {showVideoGenerator && selectedImageForVideo && (
-        <VideoGenerator
-          isOpen={showVideoGenerator}
-          onClose={() => {
-            setShowVideoGenerator(false);
-            setSelectedImageForVideo(null);
-          }}
-          imageFile={selectedImageForVideo}
-        />
-      )}
     </div>
   );
 };

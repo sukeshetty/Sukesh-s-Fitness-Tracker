@@ -10,17 +10,14 @@ interface ChatInputProps {
   savedMeals: SavedMeal[];
   onDeleteSavedMeal: (name: string) => void;
   onImageForAnalysis: (file: File) => void;
-  onImageForVideo: (file: File) => void;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmitting, savedMeals, onDeleteSavedMeal, onImageForAnalysis, onImageForVideo }) => {
+const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmitting, savedMeals, onDeleteSavedMeal, onImageForAnalysis }) => {
   const [input, setInput] = useState('');
   const [showSavedMeals, setShowSavedMeals] = useState(false);
-  const [showUploadOptions, setShowUploadOptions] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const analysisFileRef = useRef<HTMLInputElement>(null);
-  const videoFileRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +46,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowSavedMeals(false);
-        setShowUploadOptions(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -61,7 +57,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
         handler(e.target.files[0]);
     }
     e.target.value = ''; // Reset file input
-    setShowUploadOptions(false);
   }
 
   return (
@@ -87,14 +82,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
             )}
         </div>
       )}
-      {showUploadOptions && (
-         <div className="absolute bottom-full right-0 mb-2 bg-black/30 backdrop-blur-xl rounded-lg shadow-lg p-2 border border-white/10 z-10 w-60">
-             <ul className="text-zinc-200">
-                <li><button onClick={() => analysisFileRef.current?.click()} className="w-full text-left p-2 hover:bg-white/10 rounded-md">Analyze Food Photo</button></li>
-                <li><button onClick={() => videoFileRef.current?.click()} className="w-full text-left p-2 hover:bg-white/10 rounded-md">Create Video from Photo</button></li>
-             </ul>
-         </div>
-      )}
       <form onSubmit={handleSubmit} className="flex items-end p-2 bg-black/30 backdrop-blur-xl rounded-2xl shadow-lg border border-white/10">
         <button type="button" onClick={() => setShowSavedMeals(s => !s)} className="text-zinc-300 hover:text-zinc-100 p-3 rounded-full hover:bg-white/10 transition-colors flex-shrink-0" aria-label="Show saved meals" >
           <BookmarkIcon className="w-5 h-5" />
@@ -111,9 +98,8 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
         />
         <div className="flex items-end flex-shrink-0">
             <input type="file" accept="image/*" ref={analysisFileRef} onChange={(e) => handleFileChange(e, onImageForAnalysis)} className="hidden" />
-            <input type="file" accept="image/*" ref={videoFileRef} onChange={(e) => handleFileChange(e, onImageForVideo)} className="hidden" />
             
-            <button type="button" onClick={() => setShowUploadOptions(s => !s)} className="text-zinc-300 hover:text-zinc-100 p-3 rounded-full hover:bg-white/10 transition-colors" aria-label="Upload file" >
+            <button type="button" onClick={() => analysisFileRef.current?.click()} className="text-zinc-300 hover:text-zinc-100 p-3 rounded-full hover:bg-white/10 transition-colors" aria-label="Upload photo for analysis" >
                 <PaperclipIcon className="w-5 h-5" />
             </button>
 

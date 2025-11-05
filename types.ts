@@ -5,9 +5,9 @@ export enum MessageRole {
 
 export interface Ingredient {
   ingredient: string;
-  calories: number | string;
-  protein: number | string;
-  fat: number | string;
+  calories: number;
+  protein: number;
+  fat: number;
   notes: string;
   isHealthy: boolean;
 }
