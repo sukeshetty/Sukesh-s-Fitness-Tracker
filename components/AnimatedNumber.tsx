@@ -1,72 +1,107 @@
-import React, { useState, useEffect, useRef } from 'react';
-
-// Custom hook to get the previous value of a prop or state
-function usePrevious<T>(value: T): T | undefined {
-  // FIX: Provide an initial value to the useRef hook to satisfy TypeScript.
-  const ref = useRef<T | undefined>(undefined);
-  useEffect(() => {
-    ref.current = value;
-  });
-  return ref.current;
-}
+import React, { useEffect, useRef, useState } from 'react';
 
 interface AnimatedNumberProps {
   value: number;
   duration?: number;
+  decimals?: number;
+  suffix?: string;
+  className?: string;
+  showChangeIndicator?: boolean; // Show +/- indicator
 }
 
-const AnimatedNumber: React.FC<AnimatedNumberProps> = ({ value, duration = 500 }) => {
+const AnimatedNumber: React.FC<AnimatedNumberProps> = ({ 
+  value, 
+  duration = 800, 
+  decimals = 0,
+  suffix = '',
+  className = '',
+  showChangeIndicator = false,
+}) => {
   const [displayValue, setDisplayValue] = useState(0);
-  const previousValue = usePrevious(value);
-  // FIX: Provide an initial value to the useRef hook to satisfy TypeScript.
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [changeDirection, setChangeDirection] = useState<'up' | 'down' | null>(null);
+  // FIX: Provide an initial value to useRef to resolve "Expected 1 arguments, but got 0" error.
   const frameRef = useRef<number | undefined>(undefined);
+  // FIX: Provide an initial value to useRef to resolve "Expected 1 arguments, but got 0" error.
+  const startTimeRef = useRef<number | undefined>(undefined);
+  const startValueRef = useRef<number>(0);
+  const previousValueRef = useRef<number>(0);
 
   useEffect(() => {
-    // Determine the starting point for the animation.
-    // If there's no previous value (first render), start from 0.
-    // Otherwise, start from the previous value to animate the change.
-    const startValue = previousValue ?? 0;
-    const endValue = value;
-
-    // No animation needed if the value hasn't changed.
-    if (endValue === startValue) {
-        // This also ensures that on initial render if the component briefly shows 0,
-        // it snaps to the correct value if no animation is needed.
-        if (displayValue !== endValue) {
-             setDisplayValue(endValue);
-        }
+    // Set initial value without animation
+    if (previousValueRef.current === 0 && displayValue === 0) {
+        setDisplayValue(value);
+        previousValueRef.current = value;
         return;
     }
 
-    let startTime: number | null = null;
+    if (displayValue === value) return;
 
-    const animate = (timestamp: number) => {
-      if (!startTime) {
-        startTime = timestamp;
+    // Determine direction
+    if (value > previousValueRef.current) {
+      setChangeDirection('up');
+    } else if (value < previousValueRef.current) {
+      setChangeDirection('down');
+    }
+
+    setIsAnimating(true);
+    startValueRef.current = displayValue;
+    startTimeRef.current = undefined;
+
+    const animate = (currentTime: number) => {
+      if (!startTimeRef.current) {
+        startTimeRef.current = currentTime;
       }
-      const elapsedTime = timestamp - startTime;
-      const progress = Math.min(elapsedTime / duration, 1);
+
+      const elapsed = currentTime - startTimeRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Easing function (ease-out cubic)
+      const easeOut = 1 - Math.pow(1 - progress, 3);
       
-      const currentValue = startValue + (endValue - startValue) * progress;
-      setDisplayValue(Math.round(currentValue));
+      const currentValue = startValueRef.current + (value - startValueRef.current) * easeOut;
+      setDisplayValue(currentValue);
 
       if (progress < 1) {
         frameRef.current = requestAnimationFrame(animate);
+      } else {
+        setDisplayValue(value);
+        previousValueRef.current = value;
+        setIsAnimating(false);
+        
+        // Clear change indicator after animation
+        setTimeout(() => setChangeDirection(null), 500);
       }
     };
 
-    // Start the animation.
     frameRef.current = requestAnimationFrame(animate);
 
-    // Cleanup function to cancel the animation frame if the component unmounts.
     return () => {
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
       }
     };
-  }, [value, previousValue, duration, displayValue]);
+  }, [value, duration, displayValue]);
 
-  return <span>{displayValue}</span>;
+  const formattedValue = displayValue.toFixed(decimals);
+
+  const getColorClass = () => {
+    if (!isAnimating) return '';
+    if (changeDirection === 'up') return 'text-green-400 scale-110';
+    if (changeDirection === 'down') return 'text-red-400 scale-90';
+    return 'text-blue-400';
+  };
+
+  return (
+    <span className={`inline-flex items-center gap-1 transition-all duration-300 ${className} ${getColorClass()}`}>
+      {showChangeIndicator && changeDirection && (
+        <span className={`text-sm ${changeDirection === 'up' ? 'text-green-400' : 'text-red-400'}`}>
+          {changeDirection === 'up' ? '↑' : '↓'}
+        </span>
+      )}
+      <span>{formattedValue}{suffix}</span>
+    </span>
+  );
 };
 
 export default AnimatedNumber;

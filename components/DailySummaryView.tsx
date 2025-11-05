@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
-import { ChatMessage, Ingredient, MessageRole } from '../types';
+import { ChatMessage, MessageRole } from '../types';
 import { CloseIcon } from './Icons';
+import AnimatedNumber from './AnimatedNumber';
 
 interface DailySummary {
   [date: string]: {
@@ -16,10 +17,12 @@ interface DailySummaryViewProps {
   onClose: () => void;
 }
 
-const Stat: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
+const Stat: React.FC<{ label: string; value: number; suffix?: string }> = ({ label, value, suffix = '' }) => (
   <div>
     <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider">{label}</p>
-    <p className="text-2xl font-bold text-zinc-100">{value}</p>
+    <p className="text-2xl font-bold text-zinc-100">
+      <AnimatedNumber value={value} duration={600} suffix={suffix} />
+    </p>
   </div>
 );
 
@@ -86,8 +89,8 @@ const DailySummaryView: React.FC<DailySummaryViewProps> = ({ messages, isOpen, o
                   </h3>
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <Stat label="Calories" value={Math.round(summary.calories)} />
-                    <Stat label="Protein" value={`${Math.round(summary.protein)}g`} />
-                    <Stat label="Fat" value={`${Math.round(summary.fat)}g`} />
+                    <Stat label="Protein" value={Math.round(summary.protein)} suffix="g" />
+                    <Stat label="Fat" value={Math.round(summary.fat)} suffix="g" />
                   </div>
                 </div>
               );

@@ -1,19 +1,33 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Ingredient } from '../types';
+import AnimatedNumber from './AnimatedNumber';
 
 interface TotalNutritionCardProps {
   data: Ingredient[];
   timestamp: string;
 }
 
-const Stat: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
-  <div>
-    <p className="text-sm font-medium text-zinc-400 uppercase tracking-wider">{label}</p>
-    <p className="text-2xl font-bold text-zinc-100">{value}</p>
-  </div>
-);
-
 const TotalNutritionCard: React.FC<TotalNutritionCardProps> = ({ data, timestamp }) => {
+  const totals = useMemo(() => {
+    const total = {
+      calories: 0,
+      protein: 0,
+      fat: 0,
+    };
+
+    data.forEach(item => {
+      total.calories += Number(item.calories) || 0;
+      total.protein += Number(item.protein) || 0;
+      total.fat += Number(item.fat) || 0;
+    });
+
+    return {
+      calories: Math.round(total.calories),
+      protein: Math.round(total.protein),
+      fat: Math.round(total.fat),
+    };
+  }, [data]);
+
   const formattedTimestamp = new Date(timestamp).toLocaleString(undefined, {
     weekday: 'long',
     year: 'numeric',
@@ -23,29 +37,34 @@ const TotalNutritionCard: React.FC<TotalNutritionCardProps> = ({ data, timestamp
     minute: '2-digit',
   });
 
-  const totals = data.reduce(
-    (acc, item) => {
-      // Ensure values are parsed as numbers, defaulting to 0 if invalid
-      acc.calories += Number(item.calories) || 0;
-      acc.protein += Number(item.protein) || 0;
-      acc.fat += Number(item.fat) || 0;
-      return acc;
-    },
-    { calories: 0, protein: 0, fat: 0 }
-  );
-
   return (
-    <div className="bg-white/5 backdrop-blur-lg p-4 rounded-xl ring-1 ring-white/10 shadow-lg flex flex-col gap-4 mb-3">
-      <p className="text-xs text-center text-zinc-400 border-b border-zinc-700/50 pb-2">
-        {formattedTimestamp}
-      </p>
-      <h3 className="font-bold text-blue-400 text-lg text-center">
-        Meal Summary
-      </h3>
-      <div className="grid grid-cols-3 gap-4 text-center">
-        <Stat label="Calories" value={Math.round(totals.calories)} />
-        <Stat label="Protein" value={`${Math.round(totals.protein)}g`} />
-        <Stat label="Fat" value={`${Math.round(totals.fat)}g`} />
+    <div className="bg-gradient-to-r from-emerald-600/20 to-teal-600/20 backdrop-blur-lg p-4 rounded-xl ring-1 ring-emerald-500/30 shadow-lg mb-3">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xl">🍽️</span>
+          <h3 className="font-bold text-emerald-300 text-md">Meal Summary</h3>
+        </div>
+        <span className="text-xs text-zinc-400">{formattedTimestamp}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <div className="bg-white/5 rounded-lg p-2">
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1">Calories</p>
+          <p className="text-2xl font-bold text-zinc-100">
+            <AnimatedNumber value={totals.calories} duration={800} />
+          </p>
+        </div>
+        <div className="bg-white/5 rounded-lg p-2">
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1">Protein</p>
+          <p className="text-2xl font-bold text-zinc-100">
+            <AnimatedNumber value={totals.protein} duration={800} suffix="g" />
+          </p>
+        </div>
+        <div className="bg-white/5 rounded-lg p-2">
+          <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1">Fat</p>
+          <p className="text-2xl font-bold text-zinc-100">
+            <AnimatedNumber value={totals.fat} duration={800} suffix="g" />
+          </p>
+        </div>
       </div>
     </div>
   );
