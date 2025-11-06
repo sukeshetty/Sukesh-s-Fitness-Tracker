@@ -1,3 +1,4 @@
+// Force rebuild for Vercel deployment - 2025-11-06
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GoogleGenAI, Chat } from '@google/genai';
 import { ChatMessage, MessageRole, Ingredient, UserProfile, DailySummaryEntry, Activity } from './types';
