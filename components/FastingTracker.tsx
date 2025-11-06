@@ -42,7 +42,8 @@ const FastingTracker: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ i
   }, []);
 
   useEffect(() => {
-    let interval: number | null = null;
+    // FIX: Changed type from `number` to `ReturnType<typeof setInterval>` to correctly handle the timer ID from `setInterval`, which can be `NodeJS.Timeout` in some TypeScript configurations.
+    let interval: ReturnType<typeof setInterval> | null = null;
     if (fastingState.isActive && fastingState.startTime) {
       interval = setInterval(() => {
         const now = new Date();

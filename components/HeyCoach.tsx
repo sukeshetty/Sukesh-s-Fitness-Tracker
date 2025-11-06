@@ -46,20 +46,25 @@ const HeyCoach: React.FC<HeyCoachProps> = ({ isOpen, onClose, userProfile, daily
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `You are "Hey Coach," a supportive, knowledgeable, and motivating AI health coach. Your goal is to provide personalized, actionable advice based on the user's data.
+      const systemInstruction = `You are "Hey Coach," a supportive, knowledgeable, and motivating AI health coach. Your goal is to provide personalized, actionable advice based on the user's data. Analyze the user's data in the context of their question. Provide a clear, concise, and encouraging answer. Use Markdown for formatting. Break down complex topics into simple terms. If the user's data is insufficient to give a good answer, state that and explain what you'd need to see (e.g., more consistent logging). **Do not give medical advice.** Keep responses focused and easy to read.`;
       
-      **USER DATA:**
-      *   **Profile:** Age ${userProfile.age}, Gender ${userProfile.gender}, Weight ${userProfile.weight}kg, Goal: ${userProfile.goal}, Health Conditions: ${userProfile.healthConditions.join(', ') || 'None'}.
-      *   **Recent Performance (last ${recentSummaries.length} days of logs):**
-          ${summaryText || "No logs available for this period."}
-      
-      **USER'S QUESTION:**
-      "${messageText}"
-      
-      **YOUR TASK:**
-      Analyze the user's data in the context of their question. Provide a clear, concise, and encouraging answer. Use Markdown for formatting. Break down complex topics into simple terms. If the user's data is insufficient to give a good answer, state that and explain what you'd need to see (e.g., more consistent logging). **Do not give medical advice.** Keep responses focused and easy to read.`;
+      const userPrompt = `
+        **USER DATA:**
+        *   **Profile:** Age ${userProfile.age}, Gender ${userProfile.gender}, Weight ${userProfile.weight}kg, Goal: ${userProfile.goal}, Health Conditions: ${userProfile.healthConditions.join(', ') || 'None'}.
+        *   **Recent Performance (last ${recentSummaries.length} days of logs):**
+            ${summaryText || "No logs available for this period."}
+        
+        **USER'S QUESTION:**
+        "${messageText}"
+      `;
 
-      const result = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+      const result = await ai.models.generateContent({ 
+        model: 'gemini-2.5-pro', 
+        contents: [{ parts: [{ text: userPrompt }] }],
+        config: {
+          systemInstruction,
+        }
+      });
       setConversation(prev => [...prev, { role: 'model', content: result.text }]);
     } catch (err) {
       console.error(err);

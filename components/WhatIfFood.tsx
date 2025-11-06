@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 import { DailySummaryEntry, UserProfile } from '../types';
 import { CloseIcon, LightbulbIcon, FireIcon, TargetIcon, RunIcon, SwapIcon } from './Icons';
 import Spinner from './Spinner';
@@ -20,6 +20,69 @@ interface AnalysisResult {
     weeklyAdjustments: { activity: string; duration: string; emoji: string; }[];
     swapSuggestions: { suggestion: string; caloriesSaved: number; emoji: string; }[];
 }
+
+const responseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    clarificationNeeded: {
+      type: Type.STRING,
+      description: "A question to ask the user if their input is too vague. This should be null if the input is clear.",
+      nullable: true,
+    },
+    analysis: {
+      type: Type.OBJECT,
+      description: "The full nutritional analysis. This should be null if clarification is needed.",
+      nullable: true,
+      properties: {
+        foodName: { type: Type.STRING },
+        estimatedNutrition: {
+          type: Type.OBJECT,
+          properties: {
+            calories: { type: Type.NUMBER },
+            protein: { type: Type.NUMBER },
+            fat: { type: Type.NUMBER },
+          },
+          required: ['calories', 'protein', 'fat']
+        },
+        dailyImpact: {
+          type: Type.OBJECT,
+          properties: {
+            excessCalories: { type: Type.NUMBER },
+            excessProtein: { type: Type.NUMBER },
+            excessFat: { type: Type.NUMBER },
+          },
+           required: ['excessCalories', 'excessProtein', 'excessFat']
+        },
+        weeklyAdjustments: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              activity: { type: Type.STRING },
+              duration: { type: Type.STRING },
+              emoji: { type: Type.STRING },
+            },
+            required: ['activity', 'duration', 'emoji']
+          }
+        },
+        swapSuggestions: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              suggestion: { type: Type.STRING },
+              caloriesSaved: { type: Type.NUMBER },
+              emoji: { type: Type.STRING },
+            },
+            required: ['suggestion', 'caloriesSaved', 'emoji']
+          }
+        }
+      },
+      required: ['foodName', 'estimatedNutrition', 'dailyImpact', 'weeklyAdjustments', 'swapSuggestions']
+    }
+  }
+};
+
 
 const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, dailySummaries }) => {
   const [foodInput, setFoodInput] = useState('');
@@ -53,7 +116,7 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `You are a nutrition calculator and strategist. A user wants to know the impact of eating a specific food.
+      const prompt = `You are a nutrition calculator and strategist. A user wants to know the impact of eating a specific food. Analyze their input and return a JSON object that adheres to the provided schema.
 
       **Conversation History:**
       ${updatedHistory.join('\n')}
@@ -65,58 +128,43 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
       - 7-Day Average Net Calorie Intake: ${Math.round(weeklyAvgCalories)}
       
       **Your Task:**
-      Your response MUST start with a JSON object in a \`\`\`json code block.
-      The JSON object must have one of two top-level keys: "clarificationNeeded" OR "analysis".
-      
-      1.  **If the user's input is too vague** (e.g., "pizza"):
-          - The JSON should be: \`{"clarificationNeeded": "Your clarifying question here."}\`
-          - Example: \`{"clarificationNeeded": "What kind of pizza and how many slices?"}\`
-      
-      2.  **If the user's input is specific enough:**
-          - The JSON should contain the "analysis" object with the following structure:
-            - **foodName**: The food as you understood it.
-            - **estimatedNutrition**: { "calories": number, "protein": number, "fat": number }
-            - **dailyImpact**: { "excessCalories": number, "excessProtein": number, "excessFat": number } (Calculate the amount EACH nutrient would go OVER the daily target. If under, use 0 or a negative number.)
-            - **weeklyAdjustments**: An array of 2 objects: { "activity": string, "duration": string, "emoji": string }
-            - **swapSuggestions**: An array of 2 objects: { "suggestion": string, "caloriesSaved": number, "emoji": string }
-      
-      Do not add any text outside of the JSON code block.`;
+      - If the user's input is too vague (e.g., "pizza"), set the "clarificationNeeded" field in the JSON with a clarifying question. The "analysis" field should be null.
+      - If the user's input is specific enough, perform the analysis and populate the "analysis" object. The "clarificationNeeded" field should be null.
+      - Calculate "excess" values in "dailyImpact" by determining how much EACH nutrient would go OVER its daily target. If it's under the target, the value can be 0 or negative.
+      - Provide two "weeklyAdjustments" and two "swapSuggestions".`;
 
       const response = await ai.models.generateContent({ 
         model: 'gemini-2.5-pro', 
         contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: responseSchema,
+        }
       });
 
       const responseText = response.text;
-      // Use a more robust regex to find a JSON object, which might not be in a markdown block.
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       
-      if (jsonMatch && jsonMatch[0]) {
-        try {
-          const data = JSON.parse(jsonMatch[0]);
+      try {
+        const data = JSON.parse(responseText);
 
-          if (data.clarificationNeeded) {
-            setClarificationQuestion(data.clarificationNeeded);
-            setConversationHistory(prev => [...prev, `User: ${foodInput}`, `AI: ${data.clarificationNeeded}`]);
-            setFoodInput('');
-          } else if (data.analysis) {
-            if (data.analysis.foodName && data.analysis.estimatedNutrition && data.analysis.dailyImpact && data.analysis.weeklyAdjustments && data.analysis.swapSuggestions) {
-               setAnalysisResult(data.analysis);
-               setConversationHistory([]);
-               setFoodInput('');
-            } else {
-               throw new Error("Received analysis object is missing required fields.");
-            }
+        if (data.clarificationNeeded) {
+          setClarificationQuestion(data.clarificationNeeded);
+          setConversationHistory(prev => [...prev, `User: ${foodInput}`, `AI: ${data.clarificationNeeded}`]);
+          setFoodInput('');
+        } else if (data.analysis) {
+          if (data.analysis.foodName && data.analysis.estimatedNutrition && data.analysis.dailyImpact && data.analysis.weeklyAdjustments && data.analysis.swapSuggestions) {
+             setAnalysisResult(data.analysis);
+             setConversationHistory([]);
+             setFoodInput('');
           } else {
-              throw new Error("AI response JSON is missing 'clarificationNeeded' or 'analysis' key.");
+             throw new Error("Received analysis object is missing required fields.");
           }
-        } catch (parseError) {
-          console.error("JSON Parsing Error:", parseError, "Raw text:", responseText);
-          setError("The AI response was not in the expected format. Please try again.");
+        } else {
+            throw new Error("AI response did not provide clarification or analysis.");
         }
-      } else {
-          console.error("No JSON block found in response:", responseText);
-          setError("Could not find a valid analysis in the AI's response. Please try rephrasing your request.");
+      } catch (parseError) {
+        console.error("JSON Parsing Error:", parseError, "Raw text:", responseText);
+        setError("The AI response was not in the expected format. Please try again.");
       }
 
     } catch (err) {
