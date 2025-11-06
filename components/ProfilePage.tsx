@@ -40,12 +40,66 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
   const [isGeneratingPersona, setIsGeneratingPersona] = useState(false);
   const [reportAnalysis, setReportAnalysis] = useState<{ summary: string; conditions: string[] } | null>(null);
   const reportFileInputRef = useRef<HTMLInputElement>(null);
+  const screenshotFileInputRef = useRef<HTMLInputElement>(null);
+  const [uiScreenshots, setUiScreenshots] = useState<Array<{ id: string; dataUrl: string; timestamp: string }>>([]);
   const { theme } = useTheme();
   const isLight = theme === 'light';
 
   useEffect(() => {
     setProfile(userProfile || defaultProfile);
   }, [userProfile]);
+
+  useEffect(() => {
+    // Load screenshots from localStorage
+    try {
+      const saved = localStorage.getItem('ui-screenshots');
+      if (saved) {
+        setUiScreenshots(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.error('Failed to load screenshots:', error);
+    }
+  }, []);
+
+  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    try {
+      const newScreenshots: Array<{ id: string; dataUrl: string; timestamp: string }> = [];
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const dataUrl = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+
+        newScreenshots.push({
+          id: Date.now().toString() + i,
+          dataUrl,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const updated = [...uiScreenshots, ...newScreenshots];
+      setUiScreenshots(updated);
+      localStorage.setItem('ui-screenshots', JSON.stringify(updated));
+      triggerHapticFeedback();
+    } catch (error) {
+      console.error('Failed to upload screenshots:', error);
+    }
+
+    if (e.target) e.target.value = '';
+  };
+
+  const handleDeleteScreenshot = (id: string) => {
+    const updated = uiScreenshots.filter(s => s.id !== id);
+    setUiScreenshots(updated);
+    localStorage.setItem('ui-screenshots', JSON.stringify(updated));
+    triggerHapticFeedback(10);
+  };
 
   const handleGeneratePersona = async () => {
     triggerHapticFeedback();
@@ -372,6 +426,50 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
                     <input type="text" value={newCondition} onChange={e => setNewCondition(e.target.value)} placeholder="e.g., Diabetes, High BP" onKeyPress={e => e.key === 'Enter' && handleAddCondition()} className={`flex-1 w-full rounded-lg p-2 border ${inputClasses}`}/>
                     <button onClick={handleAddCondition} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white">Add</button>
                 </div>
+            </section>
+
+            {/* UI Issue Screenshots */}
+            <section>
+                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-3">📸 UI Issue Screenshots</h3>
+                <p className="text-xs text-[var(--text-secondary)] mb-3">Upload screenshots of any UI issues you encounter. These will be saved and can be reviewed to fix bugs.</p>
+                <input type="file" ref={screenshotFileInputRef} onChange={handleScreenshotUpload} accept="image/*" multiple className="hidden" />
+                <button
+                    onClick={() => { screenshotFileInputRef.current?.click(); triggerHapticFeedback(); }}
+                    className="w-full mb-4 py-2.5 bg-cyan-700 hover:bg-cyan-600 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2"
+                >
+                    📷 Upload Screenshots
+                </button>
+
+                {uiScreenshots.length > 0 && (
+                    <div className="space-y-3">
+                        {uiScreenshots.map((screenshot) => (
+                            <div key={screenshot.id} className={`rounded-lg overflow-hidden border ${isLight ? 'border-rose-200 bg-rose-50' : 'border-zinc-700 bg-zinc-800/50'}`}>
+                                <div className="p-2 flex items-center justify-between">
+                                    <span className="text-xs text-[var(--text-secondary)]">
+                                        {new Date(screenshot.timestamp).toLocaleString()}
+                                    </span>
+                                    <button
+                                        onClick={() => handleDeleteScreenshot(screenshot.id)}
+                                        className="text-red-400 hover:text-red-300 px-2 py-1 rounded text-sm"
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
+                                <img
+                                    src={screenshot.dataUrl}
+                                    alt="UI Issue Screenshot"
+                                    className="w-full h-auto"
+                                />
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {uiScreenshots.length === 0 && (
+                    <div className={`text-center py-8 rounded-lg border-2 border-dashed ${isLight ? 'border-rose-200 bg-rose-50/50' : 'border-zinc-700 bg-zinc-800/30'}`}>
+                        <p className="text-sm text-[var(--text-secondary)]">No screenshots uploaded yet</p>
+                    </div>
+                )}
             </section>
         </div>
         <footer className="p-4 border-t border-[var(--glass-border)]">
