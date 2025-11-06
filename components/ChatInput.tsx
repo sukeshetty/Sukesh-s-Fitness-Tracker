@@ -1,23 +1,24 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { SendIcon, PaperclipIcon } from './Icons';
+import { SendIcon, PaperclipIcon, CalendarIcon } from './Icons';
 import Spinner from './Spinner';
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, date: string) => void;
   isSending: boolean;
   isSubmitting: boolean;
-  onImageForAnalysis: (file: File) => void;
+  onImageForAnalysis: (file: File, date: string) => void;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmitting, onImageForAnalysis }) => {
   const [input, setInput] = useState('');
+  const [logDate, setLogDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const analysisFileRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim()) {
-      onSendMessage(input);
+      onSendMessage(input, logDate);
       setInput('');
     }
   };
@@ -39,7 +40,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-        onImageForAnalysis(e.target.files[0]);
+        onImageForAnalysis(e.target.files[0], logDate);
     }
     e.target.value = ''; // Reset file input
   }
@@ -58,8 +59,21 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
           disabled={isSubmitting}
         />
         <div className="flex items-end flex-shrink-0">
-            <input type="file" accept="image/*" ref={analysisFileRef} onChange={handleFileChange} className="hidden" />
+            <div className="relative flex items-center">
+                <input
+                    type="date"
+                    value={logDate}
+                    onChange={(e) => setLogDate(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    aria-label="Select log date"
+                />
+                <div className="p-3 text-zinc-300 pointer-events-none">
+                    <CalendarIcon className="w-5 h-5" />
+                </div>
+            </div>
             
+            <input type="file" accept="image/*" ref={analysisFileRef} onChange={handleFileChange} className="hidden" />
             <button type="button" onClick={() => analysisFileRef.current?.click()} className="text-zinc-300 hover:text-zinc-100 p-3 rounded-full hover:bg-white/10 transition-colors" aria-label="Upload photo for analysis" >
                 <PaperclipIcon className="w-5 h-5" />
             </button>

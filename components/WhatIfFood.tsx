@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DailySummaryEntry, UserProfile } from '../types';
-import { CloseIcon, LightbulbIcon, FireIcon, TargetIcon, RunIcon, SwapIcon } from './Icons';
+import { CloseIcon, LightbulbIcon, FireIcon, TargetIcon, RunIcon, SwapIcon, UserIcon } from './Icons';
 import Spinner from './Spinner';
 import { useTheme } from './contexts/ThemeContext';
 import AnimatedNumber from './AnimatedNumber';
@@ -11,6 +11,7 @@ interface WhatIfFoodProps {
   onClose: () => void;
   userProfile: UserProfile | null;
   dailySummaries: DailySummaryEntry[];
+  onOpenProfile: () => void;
 }
 
 interface AnalysisResult {
@@ -84,7 +85,7 @@ const responseSchema = {
 };
 
 
-const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, dailySummaries }) => {
+const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, dailySummaries, onOpenProfile }) => {
   const [foodInput, setFoodInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -137,7 +138,7 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
 
       const response = await ai.models.generateContent({ 
         model: 'gemini-2.5-flash', 
-        contents: prompt,
+        contents: [{ parts: [{ text: prompt }] }],
         config: {
             responseMimeType: "application/json",
             responseSchema: responseSchema,
@@ -189,9 +190,40 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
     setError(null);
   };
 
+  const handleGoToProfile = () => {
+    onClose();
+    onOpenProfile();
+  };
+
   const inputClasses = isLight ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-zinc-800/80 border-zinc-600 text-white';
 
   if (!isOpen) return null;
+
+  if (!userProfile) {
+    return (
+      <div className="fixed inset-0 bg-[var(--modal-overlay-bg)] backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="bg-[var(--component-bg)] backdrop-blur-xl rounded-2xl ring-1 ring-[var(--glass-border)] w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+          <header className="flex items-center justify-between p-4 border-b border-[var(--glass-border)]">
+            <div className="flex items-center gap-3"><LightbulbIcon className="w-6 h-6 text-pink-400" /><h2 className="text-xl font-bold text-[var(--text-primary)]">"What If I Eat..." Planner</h2></div>
+            <button onClick={onClose} className="p-1 text-[var(--icon-color)] hover:text-[var(--text-primary)]"><CloseIcon className="w-6 h-6" /></button>
+          </header>
+          <div className="flex-1 overflow-y-auto p-6 text-center">
+            <UserIcon className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Complete Your Profile</h3>
+            <p className="text-[var(--text-secondary)] mb-6">
+              The "What If" planner needs your profile data to give you an accurate analysis. Please complete your profile first.
+            </p>
+            <button
+              onClick={handleGoToProfile}
+              className="w-full py-3 bg-pink-600 hover:bg-pink-500 rounded-lg font-semibold text-white transition-colors"
+            >
+              Go to Profile
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-[var(--modal-overlay-bg)] backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>

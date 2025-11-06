@@ -4,16 +4,16 @@ import { ChatMessage, MessageRole, Ingredient, UserProfile, DailySummaryEntry, A
 import ChatInput from './components/ChatInput';
 import ChatMessageBubble from './components/ChatMessage';
 import Greeting from './components/Greeting';
-import { UserIcon, CalendarIcon, ChartBarIcon } from './components/Icons';
+import { UserIcon, CalendarIcon, ChartBarIcon, HomeIcon } from './components/Icons';
 import DuplicateWarningModal from './components/DuplicateWarningModal';
 import ProfilePage from './components/ProfilePage';
-import DailySummaryHistory from './components/DailySummaryHistory';
 import Reports from './components/Reports';
 import ThemeToggle from './components/ThemeToggle';
 import HeyCoach from './components/HeyCoach';
 import DietAnalysis from './components/DietAnalysis';
 import FastingTracker from './components/FastingTracker';
 import WhatIfFood from './components/WhatIfFood';
+import DailySummaryHistory from './components/DailySummaryHistory';
 
 const BASE_SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
 
@@ -144,6 +144,7 @@ const calculateSimilarity = (str1: string, str2: string): number => {
 
 
 type LoadingState = { type: 'idle' } | { type: 'sending' } | { type: 'editing', id: string };
+type View = 'home' | 'chat';
 
 const App: React.FC = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -151,10 +152,11 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [view, setView] = useState<View>('home');
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   
   const [isHeyCoachOpen, setIsHeyCoachOpen] = useState(false);
   const [isDietAnalysisOpen, setIsDietAnalysisOpen] = useState(false);
@@ -166,7 +168,7 @@ const App: React.FC = () => {
     show: boolean;
     content: string;
     minutesAgo: number;
-    pendingMessage: { userInput: string; imageUrl?: string } | null;
+    pendingMessage: { userInput: string; imageUrl?: string; date: string; } | null;
   }>({ show: false, content: '', minutesAgo: 0, pendingMessage: null });
   
   const chatSessionRef = useRef<Chat | null>(null);
@@ -203,11 +205,10 @@ const App: React.FC = () => {
     setIsProfileOpen(false);
   }, []);
 
-  const saveDailySummary = useCallback(() => {
+  const saveDailySummary = useCallback((dateToSave: string) => {
     if (!userProfile) return;
 
-    const today = new Date().toISOString().split('T')[0];
-    const todayMessages = messages.filter(m => m.timestamp.startsWith(today) && m.role === MessageRole.MODEL);
+    const todayMessages = messagesRef.current.filter(m => m.timestamp.startsWith(dateToSave) && m.role === MessageRole.MODEL);
 
     let totalCalories = 0, totalProtein = 0, totalFat = 0, totalCaloriesBurned = 0, totalMinutesActive = 0;
     let mealsLogged = 0;
@@ -230,7 +231,7 @@ const App: React.FC = () => {
     });
 
     const summary: DailySummaryEntry = {
-      date: today,
+      date: dateToSave,
       totals: { calories: Math.round(totalCalories), protein: Math.round(totalProtein), fat: Math.round(totalFat), totalCaloriesBurned: Math.round(totalCaloriesBurned), totalMinutesActive: Math.round(totalMinutesActive) },
       targets: userProfile.dailyTargets,
       mealsLogged: mealsLogged,
@@ -243,7 +244,7 @@ const App: React.FC = () => {
 
     const saved = localStorage.getItem(DAILY_SUMMARIES_KEY);
     const summaries: DailySummaryEntry[] = saved ? JSON.parse(saved) : [];
-    const existingIndex = summaries.findIndex((s) => s.date === today);
+    const existingIndex = summaries.findIndex((s) => s.date === dateToSave);
     if (existingIndex >= 0) {
       summaries[existingIndex] = summary;
     } else {
@@ -251,10 +252,15 @@ const App: React.FC = () => {
     }
     localStorage.setItem(DAILY_SUMMARIES_KEY, JSON.stringify(summaries));
     setAllDailySummaries(summaries);
-  }, [messages, userProfile]);
+  }, [userProfile]);
 
   useEffect(() => {
-    if (messages.length > 0) saveDailySummary();
+    if (messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage) {
+        saveDailySummary(lastMessage.timestamp.split('T')[0]);
+      }
+    }
   }, [messages, saveDailySummary]);
 
   const getEnhancedSystemInstruction = useCallback(() => {
@@ -296,11 +302,16 @@ const App: React.FC = () => {
     onComplete({ nutritionData, activityData, remainingText });
   };
   
-  const handleSendMessageInternal = async (userInput: string, imageUrl?: string) => {
+  const handleSendMessageInternal = async (userInput: string, date: string, imageUrl?: string) => {
+    setView('chat');
     setError(null);
     setLoadingState({ type: 'sending' });
+
+    const timestamp = date 
+        ? new Date(date + 'T' + new Date().toTimeString().split(' ')[0]).toISOString() 
+        : new Date().toISOString();
   
-    const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: userInput, imageUrl, timestamp: new Date().toISOString() };
+    const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: userInput, imageUrl, timestamp };
     const modelMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.MODEL, content: '', timestamp: new Date().toISOString() };
     setMessages(prev => [...prev, userMessage, modelMessage]);
   
@@ -322,7 +333,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleSendMessage = useCallback(async (userInput: string, imageUrl?: string) => {
+  const handleSendMessage = useCallback(async (userInput: string, date: string) => {
     if (!userInput.trim()) return;
     const normalizedInput = userInput.trim().toLowerCase();
     const recentTimeThreshold = 5 * 60 * 1000;
@@ -332,32 +343,36 @@ const App: React.FC = () => {
       const msgTime = new Date(msg.timestamp).getTime();
       return (now - msgTime) < recentTimeThreshold && 
              calculateSimilarity(msg.content.trim().toLowerCase(), normalizedInput) > 0.85 && 
-             !msg.imageUrl && !imageUrl;
+             !msg.imageUrl;
     });
     
     if (duplicateMatches.length > 0) {
       const lastDuplicate = duplicateMatches.pop()!;
       const minutesAgo = Math.round((now - new Date(lastDuplicate.timestamp).getTime()) / 60000);
-      setDuplicateWarning({ show: true, content: lastDuplicate.content, minutesAgo, pendingMessage: { userInput, imageUrl } });
+      setDuplicateWarning({ show: true, content: lastDuplicate.content, minutesAgo, pendingMessage: { userInput, date } });
       return;
     }
-    await handleSendMessageInternal(userInput, imageUrl);
+    await handleSendMessageInternal(userInput, date);
   }, []);
   
   const handleConfirmDuplicate = useCallback(async () => {
     const pending = duplicateWarning.pendingMessage;
     setDuplicateWarning({ show: false, content: '', minutesAgo: 0, pendingMessage: null });
-    if (pending) await handleSendMessageInternal(pending.userInput, pending.imageUrl);
+    if (pending) await handleSendMessageInternal(pending.userInput, pending.date, pending.imageUrl);
   }, [duplicateWarning]);
 
   const handleCancelDuplicate = useCallback(() => { setDuplicateWarning({ show: false, content: '', minutesAgo: 0, pendingMessage: null }); }, []);
 
-  const handleImageForAnalysis = async (file: File) => {
+  const handleImageForAnalysis = async (file: File, date: string) => {
     if (loadingState.type !== 'idle') return;
+    setView('chat');
     setLoadingState({ type: 'sending' });
     setError(null);
     const imageUrl = URL.createObjectURL(file);
-    const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: "Analyzing image...", imageUrl, timestamp: new Date().toISOString() };
+    const timestamp = date 
+        ? new Date(date + 'T' + new Date().toTimeString().split(' ')[0]).toISOString() 
+        : new Date().toISOString();
+    const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: "Analyzing image...", imageUrl, timestamp };
     setMessages(prev => [...prev, userMessage]);
 
     try {
@@ -366,9 +381,8 @@ const App: React.FC = () => {
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: { parts: [ { text: "Describe the food items in this image for a nutrition log. Be descriptive and concise." }, imagePart ] } });
         const foodDescription = response.text;
         
-        // Update the user message with the description, then send it for analysis
         setMessages(prev => prev.map(msg => msg.id === userMessage.id ? { ...msg, content: foodDescription } : msg));
-        await handleSendMessageInternal(foodDescription, imageUrl);
+        await handleSendMessageInternal(foodDescription, date, imageUrl);
 
     } catch (e) {
         let errorMessage = `Image analysis failed: ${e instanceof Error ? e.message : "An unknown error occurred."}`;
@@ -395,6 +409,8 @@ const App: React.FC = () => {
         return;
     }
     const modelMessage = originalMessages[userMessageIndex + 1];
+    const originalUserMessage = originalMessages[userMessageIndex];
+    const messageDate = new Date(originalUserMessage.timestamp).toISOString().split('T')[0];
 
     const updatedMessages = [...originalMessages];
     updatedMessages[userMessageIndex] = { ...updatedMessages[userMessageIndex], content: newContent, timestamp: new Date().toISOString() };
@@ -410,14 +426,15 @@ const App: React.FC = () => {
     } catch (e) {
         let errorMessage = `Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`;
         if (e instanceof Error && (e.message.includes('quota') || e.message.includes('RESOURCE_EXHAUSTED'))) {
-            errorMessage = "I'm sorry, I'm experiencing high traffic right now. Please try again in a moment.";
+            errorMessage = "I'm sorry, I'm experiencing high traffic right now. Please try sending your message again in a moment.";
         }
         setError(errorMessage);
         setMessages(originalMessages);
     } finally {
         setLoadingState({ type: 'idle' });
+        saveDailySummary(messageDate);
     }
-  }, []);
+  }, [saveDailySummary]);
 
   const getRelativeDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -437,7 +454,7 @@ const App: React.FC = () => {
         if (!groups[dateKey]) groups[dateKey] = [];
         groups[dateKey].push(msg);
     });
-    return Object.entries(groups).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime());
+    return Object.entries(groups).sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime());
   }, [messages]);
 
   useEffect(() => { if (!editingMessageId) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [groupedMessages, editingMessageId]);
@@ -445,9 +462,12 @@ const App: React.FC = () => {
   return (
     <div className="flex flex-col h-screen bg-transparent text-zinc-200 font-sans">
       <header className="bg-[var(--glass-bg)] backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-[var(--glass-border)]">
-        <h1 className="text-xl font-medium text-[var(--text-primary)]">SukeshFIT</h1>
+        <div className="flex items-center gap-2">
+            <button onClick={() => setView('home')} title="Home" className="p-2 text-[var(--icon-color)] hover:text-green-500 transition-colors"><HomeIcon className="w-6 h-6"/></button>
+            <h1 className="text-xl font-medium text-[var(--text-primary)]">SukeshFIT</h1>
+        </div>
         <div className="flex items-center gap-1 sm:gap-2">
-            <button onClick={() => setIsHistoryOpen(true)} title="Daily History" className="p-2 text-[var(--icon-color)] hover:text-pink-500 transition-colors"><CalendarIcon className="w-6 h-6"/></button>
+            <button onClick={() => setIsHistoryOpen(true)} title="Daily Log History" className="p-2 text-[var(--icon-color)] hover:text-cyan-500 transition-colors"><CalendarIcon className="w-6 h-6"/></button>
             <button onClick={() => setIsReportsOpen(true)} title="Weekly/Monthly Reports" className="p-2 text-[var(--icon-color)] hover:text-rose-500 transition-colors"><ChartBarIcon className="w-6 h-6"/></button>
             <button onClick={() => setIsProfileOpen(true)} title="Profile" className="p-2 text-[var(--icon-color)] hover:text-fuchsia-500 transition-colors"><UserIcon className="w-6 h-6"/></button>
             <ThemeToggle />
@@ -456,7 +476,7 @@ const App: React.FC = () => {
       
       <main className="flex-1 overflow-y-auto px-4 md:px-6">
         <div className="max-w-4xl mx-auto w-full h-full">
-          {messages.length === 0 ? (
+          {view === 'home' ? (
             <Greeting
               userProfile={userProfile}
               onOpenHeyCoach={() => setIsHeyCoachOpen(true)}
@@ -510,15 +530,15 @@ const App: React.FC = () => {
         </div>
       </footer>
 
-      <DailySummaryHistory isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
       <Reports isOpen={isReportsOpen} onClose={() => setIsReportsOpen(false)} />
+      <DailySummaryHistory isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} summaries={allDailySummaries} />
       <DuplicateWarningModal isOpen={duplicateWarning.show} duplicateContent={duplicateWarning.content} minutesAgo={duplicateWarning.minutesAgo} onConfirm={handleConfirmDuplicate} onCancel={handleCancelDuplicate} />
       {isProfileOpen && <ProfilePage userProfile={userProfile} onSave={handleSaveProfile} onClose={() => setIsProfileOpen(false)} allDailySummaries={allDailySummaries} />}
       
-      {isHeyCoachOpen && <HeyCoach isOpen={isHeyCoachOpen} onClose={() => setIsHeyCoachOpen(false)} userProfile={userProfile} dailySummaries={allDailySummaries} />}
-      {isDietAnalysisOpen && <DietAnalysis isOpen={isDietAnalysisOpen} onClose={() => setIsDietAnalysisOpen(false)} userProfile={userProfile} allDailySummaries={allDailySummaries} />}
+      {isHeyCoachOpen && <HeyCoach isOpen={isHeyCoachOpen} onClose={() => setIsHeyCoachOpen(false)} userProfile={userProfile} dailySummaries={allDailySummaries} onOpenProfile={() => setIsProfileOpen(true)} />}
+      {isDietAnalysisOpen && <DietAnalysis isOpen={isDietAnalysisOpen} onClose={() => setIsDietAnalysisOpen(false)} userProfile={userProfile} allDailySummaries={allDailySummaries} onOpenProfile={() => setIsProfileOpen(true)} />}
       {isFastingTrackerOpen && <FastingTracker isOpen={isFastingTrackerOpen} onClose={() => setIsFastingTrackerOpen(false)} />}
-      {isWhatIfFoodOpen && <WhatIfFood isOpen={isWhatIfFoodOpen} onClose={() => setIsWhatIfFoodOpen(false)} userProfile={userProfile} dailySummaries={allDailySummaries} />}
+      {isWhatIfFoodOpen && <WhatIfFood isOpen={isWhatIfFoodOpen} onClose={() => setIsWhatIfFoodOpen(false)} userProfile={userProfile} dailySummaries={allDailySummaries} onOpenProfile={() => setIsProfileOpen(true)} />}
     </div>
   );
 };

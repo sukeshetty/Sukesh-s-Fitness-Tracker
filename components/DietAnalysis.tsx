@@ -3,7 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { DailySummaryEntry, UserProfile } from '../types';
-import { CloseIcon, ScienceIcon } from './Icons';
+import { CloseIcon, ScienceIcon, UserIcon } from './Icons';
 import Spinner from './Spinner';
 
 interface DietAnalysisProps {
@@ -11,9 +11,10 @@ interface DietAnalysisProps {
   onClose: () => void;
   userProfile: UserProfile | null;
   allDailySummaries: DailySummaryEntry[];
+  onOpenProfile: () => void;
 }
 
-const DietAnalysis: React.FC<DietAnalysisProps> = ({ isOpen, onClose, userProfile, allDailySummaries }) => {
+const DietAnalysis: React.FC<DietAnalysisProps> = ({ isOpen, onClose, userProfile, allDailySummaries, onOpenProfile }) => {
   const [loading, setLoading] = useState(false);
   const [response, setResponse] = useState('');
 
@@ -65,7 +66,38 @@ const DietAnalysis: React.FC<DietAnalysisProps> = ({ isOpen, onClose, userProfil
   
   const sanitizedMarkup = DOMPurify.sanitize(marked.parse(response) as string);
 
+  const handleGoToProfile = () => {
+    onClose();
+    onOpenProfile();
+  };
+
   if (!isOpen) return null;
+
+  if (!userProfile) {
+    return (
+      <div className="fixed inset-0 bg-[var(--modal-overlay-bg)] backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="bg-[var(--component-bg)] backdrop-blur-xl rounded-2xl ring-1 ring-[var(--glass-border)] w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+          <header className="flex items-center justify-between p-4 border-b border-[var(--glass-border)]">
+            <div className="flex items-center gap-3"><ScienceIcon className="w-6 h-6 text-green-400" /><h2 className="text-xl font-bold text-[var(--text-primary)]">Diet Analysis</h2></div>
+            <button onClick={onClose} className="p-1 text-[var(--icon-color)] hover:text-[var(--text-primary)]"><CloseIcon className="w-6 h-6" /></button>
+          </header>
+          <div className="flex-1 overflow-y-auto p-6 text-center">
+            <UserIcon className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Complete Your Profile</h3>
+            <p className="text-[var(--text-secondary)] mb-6">
+              Diet Analysis needs your profile data to give you an accurate analysis. Please complete your profile first.
+            </p>
+            <button
+              onClick={handleGoToProfile}
+              className="w-full py-3 bg-green-600 hover:bg-green-500 rounded-lg font-semibold text-white transition-colors"
+            >
+              Go to Profile
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 bg-[var(--modal-overlay-bg)] backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
