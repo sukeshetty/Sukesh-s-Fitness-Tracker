@@ -552,7 +552,7 @@ const App: React.FC = () => {
 
   return (
     <div className="flex flex-col h-screen bg-transparent text-zinc-200 font-sans">
-      <header className="bg-[var(--glass-bg)] backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-[var(--glass-border)]">
+      <header className="safe-top bg-[var(--glass-bg)] backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-[var(--glass-border)]">
         <div className="flex items-center gap-2">
             <button onClick={() => { setView('home'); triggerHapticFeedback(); }} title="Home" className="p-2 text-[var(--icon-color)] hover:text-green-500 transition-colors"><HomeIcon className="w-6 h-6"/></button>
             <h1 className="text-xl font-medium text-[var(--text-primary)]">SukeshFIT</h1>
@@ -609,7 +609,7 @@ const App: React.FC = () => {
         </div>
       </main>
     
-      <footer className="w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[var(--bg-gradient-to)] via-[var(--bg-gradient-to)]/95 to-transparent pt-4">
+      <footer className="safe-bottom w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[var(--bg-gradient-to)] via-[var(--bg-gradient-to)]/95 to-transparent pt-4">
         <div className="max-w-4xl mx-auto w-full">
             {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-lg text-sm mb-2 text-center">{error}</div>}
             <ChatInput
