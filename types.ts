@@ -31,6 +31,10 @@ export interface ChatMessage {
 }
 
 export interface UserProfile {
+  name?: string;
+  aiNickname?: string;
+  aiSummary?: string;
+  aiAvatar?: string;
   age: number;
   gender: 'male' | 'female' | 'other';
   weight: number; // in kg

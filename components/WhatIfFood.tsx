@@ -116,25 +116,27 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
 
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const prompt = `You are a nutrition calculator and strategist. A user wants to know the impact of eating a specific food. Analyze their input and return a JSON object that adheres to the provided schema.
+      const prompt = `
+        Analyze the user's food query based on their profile and conversation history. Return a JSON object matching the provided schema.
 
-      **Conversation History:**
-      ${updatedHistory.join('\n')}
-      
-      **User Profile & Context:**
-      - Daily Calorie Target: ${userProfile.dailyTargets.calories}
-      - Daily Protein Target: ${userProfile.dailyTargets.protein}g
-      - Daily Fat Target: ${userProfile.dailyTargets.fat}g
-      - 7-Day Average Net Calorie Intake: ${Math.round(weeklyAvgCalories)}
-      
-      **Your Task:**
-      - If the user's input is too vague (e.g., "pizza"), set the "clarificationNeeded" field in the JSON with a clarifying question. The "analysis" field should be null.
-      - If the user's input is specific enough, perform the analysis and populate the "analysis" object. The "clarificationNeeded" field should be null.
-      - Calculate "excess" values in "dailyImpact" by determining how much EACH nutrient would go OVER its daily target. If it's under the target, the value can be 0 or negative.
-      - Provide two "weeklyAdjustments" and two "swapSuggestions".`;
+        **User Profile:**
+        - Daily Targets: ${userProfile.dailyTargets.calories} Cal, ${userProfile.dailyTargets.protein}g Pro, ${userProfile.dailyTargets.fat}g Fat
+        - 7-Day Avg Net Intake: ${Math.round(weeklyAvgCalories)} Cal
+
+        **Conversation History:**
+        ${updatedHistory.join('\n')}
+
+        **Instructions:**
+        1.  **Vague Input:** If the latest user input is vague (e.g., "a sandwich"), ask a clarifying question in the \`clarificationNeeded\` field. \`analysis\` must be null.
+        2.  **Specific Input:** If the input is clear, provide a full analysis in the \`analysis\` field. \`clarificationNeeded\` must be null.
+            - Estimate nutrition for the food.
+            - Calculate the daily impact (amount OVER target for each macro).
+            - Suggest 2 exercise adjustments.
+            - Suggest 2 healthier food swaps.
+        `;
 
       const response = await ai.models.generateContent({ 
-        model: 'gemini-2.5-pro', 
+        model: 'gemini-2.5-flash', 
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -169,7 +171,11 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
 
     } catch (err) {
       console.error("API Error:", err);
-      setError(`An error occurred while communicating with the AI. ${err instanceof Error ? err.message : 'Please check your connection and try again.'}`);
+      let errorMsg = `An error occurred while communicating with the AI. ${err instanceof Error ? err.message : 'Please check your connection and try again.'}`;
+      if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+        errorMsg = "Analysis failed due to high traffic. Please try again later.";
+      }
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

@@ -273,7 +273,7 @@ const App: React.FC = () => {
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
         const chat = ai.chats.create({
-          model: 'gemini-2.5-pro',
+          model: 'gemini-2.5-flash',
           config: { systemInstruction: getEnhancedSystemInstruction() },
         });
         chatSessionRef.current = chat;
@@ -311,8 +311,12 @@ const App: React.FC = () => {
         ({ nutritionData, activityData, remainingText }) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData, activityData } : m))
       );
     } catch (e) {
-      setError(`Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
-      setMessages(prev => prev.filter(msg => msg.id !== userMessage.id && msg.id !== modelMessage.id));
+        let errorMessage = `Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`;
+        if (e instanceof Error && (e.message.includes('quota') || e.message.includes('RESOURCE_EXHAUSTED'))) {
+            errorMessage = "I'm sorry, I'm experiencing high traffic right now. Please try sending your message again in a moment.";
+        }
+        setError(errorMessage);
+        setMessages(prev => prev.filter(msg => msg.id !== userMessage.id && msg.id !== modelMessage.id));
     } finally {
       setLoadingState({ type: 'idle' });
     }
@@ -367,7 +371,11 @@ const App: React.FC = () => {
         await handleSendMessageInternal(foodDescription, imageUrl);
 
     } catch (e) {
-        setError(`Image analysis failed: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
+        let errorMessage = `Image analysis failed: ${e instanceof Error ? e.message : "An unknown error occurred."}`;
+        if (e instanceof Error && (e.message.includes('quota') || e.message.includes('RESOURCE_EXHAUSTED'))) {
+            errorMessage = "Image analysis failed due to high traffic. Please try again in a moment.";
+        }
+        setError(errorMessage);
         setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
         setLoadingState({ type: 'idle' });
     }
@@ -400,7 +408,11 @@ const App: React.FC = () => {
         ({ nutritionData, activityData, remainingText }) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData, activityData } : m))
       );
     } catch (e) {
-        setError(`Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`);
+        let errorMessage = `Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`;
+        if (e instanceof Error && (e.message.includes('quota') || e.message.includes('RESOURCE_EXHAUSTED'))) {
+            errorMessage = "I'm sorry, I'm experiencing high traffic right now. Please try again in a moment.";
+        }
+        setError(errorMessage);
         setMessages(originalMessages);
     } finally {
         setLoadingState({ type: 'idle' });
@@ -446,6 +458,7 @@ const App: React.FC = () => {
         <div className="max-w-4xl mx-auto w-full h-full">
           {messages.length === 0 ? (
             <Greeting
+              userProfile={userProfile}
               onOpenHeyCoach={() => setIsHeyCoachOpen(true)}
               onOpenDietAnalysis={() => setIsDietAnalysisOpen(true)}
               onOpenFastingTracker={() => setIsFastingTrackerOpen(true)}
@@ -500,7 +513,7 @@ const App: React.FC = () => {
       <DailySummaryHistory isOpen={isHistoryOpen} onClose={() => setIsHistoryOpen(false)} />
       <Reports isOpen={isReportsOpen} onClose={() => setIsReportsOpen(false)} />
       <DuplicateWarningModal isOpen={duplicateWarning.show} duplicateContent={duplicateWarning.content} minutesAgo={duplicateWarning.minutesAgo} onConfirm={handleConfirmDuplicate} onCancel={handleCancelDuplicate} />
-      {isProfileOpen && <ProfilePage userProfile={userProfile} onSave={handleSaveProfile} onClose={() => setIsProfileOpen(false)} />}
+      {isProfileOpen && <ProfilePage userProfile={userProfile} onSave={handleSaveProfile} onClose={() => setIsProfileOpen(false)} allDailySummaries={allDailySummaries} />}
       
       {isHeyCoachOpen && <HeyCoach isOpen={isHeyCoachOpen} onClose={() => setIsHeyCoachOpen(false)} userProfile={userProfile} dailySummaries={allDailySummaries} />}
       {isDietAnalysisOpen && <DietAnalysis isOpen={isDietAnalysisOpen} onClose={() => setIsDietAnalysisOpen(false)} userProfile={userProfile} allDailySummaries={allDailySummaries} />}

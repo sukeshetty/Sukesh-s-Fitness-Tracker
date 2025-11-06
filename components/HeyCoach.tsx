@@ -24,7 +24,7 @@ const HeyCoach: React.FC<HeyCoachProps> = ({ isOpen, onClose, userProfile, daily
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const { theme } = useTheme();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const isLight = theme === 'light';
 
   const scrollToBottom = () => {
@@ -59,8 +59,8 @@ const HeyCoach: React.FC<HeyCoachProps> = ({ isOpen, onClose, userProfile, daily
       `;
 
       const result = await ai.models.generateContent({ 
-        model: 'gemini-2.5-pro', 
-        contents: [{ parts: [{ text: userPrompt }] }],
+        model: 'gemini-2.5-flash', 
+        contents: userPrompt,
         config: {
           systemInstruction,
         }
@@ -68,7 +68,10 @@ const HeyCoach: React.FC<HeyCoachProps> = ({ isOpen, onClose, userProfile, daily
       setConversation(prev => [...prev, { role: 'model', content: result.text }]);
     } catch (err) {
       console.error(err);
-      setConversation(prev => [...prev, { role: 'model', content: "Sorry, I ran into an issue. Please try asking again." }]);
+      const content = (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED')))
+        ? "I can't respond right now due to high traffic. Please try again later."
+        : "Sorry, I ran into an issue. Please try asking again.";
+      setConversation(prev => [...prev, { role: 'model', content }]);
     } finally {
       setLoading(false);
     }

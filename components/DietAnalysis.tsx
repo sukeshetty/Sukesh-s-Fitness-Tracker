@@ -49,11 +49,15 @@ const DietAnalysis: React.FC<DietAnalysisProps> = ({ isOpen, onClose, userProfil
       
       Keep the tone supportive and educational. Do not give medical advice.`;
 
-      const result = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: prompt });
+      const result = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] });
       setResponse(result.text);
     } catch (err) {
       console.error(err);
-      setResponse("Sorry, I couldn't perform the analysis. Please try again.");
+      let resp = "Sorry, I couldn't perform the analysis. Please try again.";
+      if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+        resp = "Analysis failed due to high traffic. Please try again later.";
+      }
+      setResponse(resp);
     } finally {
       setLoading(false);
     }

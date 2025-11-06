@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI } from '@google/genai';
-import { UserProfile, DailyTargets } from '../types';
+import { GoogleGenAI, Modality } from '@google/genai';
+import { UserProfile, DailyTargets, DailySummaryEntry } from '../types';
 import Spinner from './Spinner';
-import { CloseIcon } from './Icons';
+import { CloseIcon, UserIcon } from './Icons';
 import { useTheme } from './contexts/ThemeContext';
 
 interface ProfilePageProps {
   onClose: () => void;
   userProfile: UserProfile | null;
   onSave: (profile: UserProfile) => void;
+  allDailySummaries: DailySummaryEntry[];
 }
 
 const defaultProfile: UserProfile = {
+    name: '',
     age: 30,
     gender: 'male',
     weight: 70,
@@ -28,12 +30,13 @@ const defaultProfile: UserProfile = {
     },
 };
 
-const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave }) => {
+const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave, allDailySummaries }) => {
   const [profile, setProfile] = useState<UserProfile>(userProfile || defaultProfile);
   const [newCondition, setNewCondition] = useState('');
   const [loading, setLoading] = useState<'idle' | 'calculating' | 'validating'>('idle');
   const [aiFeedback, setAIFeedback] = useState<string | null>(null);
   const [isAnalyzingReport, setIsAnalyzingReport] = useState(false);
+  const [isGeneratingPersona, setIsGeneratingPersona] = useState(false);
   const [reportAnalysis, setReportAnalysis] = useState<{ summary: string; conditions: string[] } | null>(null);
   const reportFileInputRef = useRef<HTMLInputElement>(null);
   const { theme } = useTheme();
@@ -42,6 +45,85 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave 
   useEffect(() => {
     setProfile(userProfile || defaultProfile);
   }, [userProfile]);
+
+  const handleGeneratePersona = async () => {
+    if (!profile.name?.trim()) {
+        setAIFeedback("Please enter your name first to generate a persona.");
+        return;
+    }
+    setIsGeneratingPersona(true);
+    setAIFeedback(null);
+    try {
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+        // --- Text Generation (Sequential Call 1) ---
+        const recentSummaries = allDailySummaries.slice(-7);
+        const summaryText = recentSummaries.map(s => `Date: ${s.date}, Net Cals: ${s.totals.calories - s.totals.totalCaloriesBurned}/${s.targets.calories}, Protein: ${s.totals.protein}/${s.targets.protein}g`).join('\n');
+        
+        const textPrompt = `You are a motivational AI. Create a persona for a user based on their profile and recent performance.
+        User Name: ${profile.name}
+        User Goal: ${profile.goal}
+        Recent Performance (last 7 days):
+        ${summaryText || "No recent logs."}
+        
+        Provide ONLY a JSON response with this exact structure: {"nickname": "<A fun, motivating nickname that vibes with their goal>", "summary": "<A witty, one-line summary of their current journey>"}`;
+
+        // Use gemini-2.5-flash for efficiency
+        const textResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: textPrompt }] }] });
+        
+        // Process text response
+        let nickname = "Fitness Fan";
+        let summary = "Ready to start the journey!";
+        const jsonMatch = textResponse.text.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            nickname = parsed.nickname;
+            summary = parsed.summary;
+        }
+
+        // --- Image Generation (Sequential Call 2) ---
+        const goalThemes: { [key: string]: string } = {
+            lose_weight: 'fitness and health',
+            maintain: 'balance and wellness',
+            gain_muscle: 'strength and power',
+        };
+        const imagePrompt = `A motivational, minimalist vector art avatar. The avatar should represent a person focused on ${goalThemes[profile.goal]}. Clean lines, vibrant, inspiring, on a simple, non-distracting background.`;
+        
+        const imageResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: [{ text: imagePrompt }] },
+            config: { responseModalities: [Modality.IMAGE] },
+        });
+
+        // Process image response
+        let avatarUrl = '';
+        for (const part of imageResponse.candidates[0].content.parts) {
+            if (part.inlineData) {
+                const base64ImageBytes: string = part.inlineData.data;
+                avatarUrl = `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
+            }
+        }
+        
+        if (!avatarUrl) throw new Error("Avatar generation failed.");
+
+        setProfile(p => ({
+            ...p,
+            aiNickname: nickname,
+            aiSummary: summary,
+            aiAvatar: avatarUrl,
+        }));
+
+    } catch (err) {
+        console.error("Persona generation failed:", err);
+        let feedback = `Failed to generate persona. ${err instanceof Error ? err.message : 'Please try again.'}`;
+        if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+            feedback = "Persona generation failed due to high traffic. Please try again in a moment.";
+        }
+        setAIFeedback(feedback);
+    } finally {
+        setIsGeneratingPersona(false);
+    }
+  };
 
   const calculateAITargets = async () => {
     setLoading('calculating');
@@ -53,7 +135,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave 
         Activity Level: ${profile.activityLevel}, Goal: ${profile.goal}
         Provide ONLY a JSON response with this exact structure: {"calories": <number>, "protein": <number>, "fat": <number>, "reasoning": "<brief explanation>"}`;
 
-      const response = await ai.models.generateContent({ model: 'gemini-2.5-pro', contents: [{ parts: [{ text: prompt }] }] });
+      const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] });
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const targets = JSON.parse(jsonMatch[0]);
@@ -62,7 +144,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave 
       }
     } catch (err) {
       console.error(err);
-      setAIFeedback('Failed to calculate targets. Please try again.');
+      let feedback = 'Failed to calculate targets. Please try again.';
+      if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+        feedback = "AI calculation failed due to high traffic or quota limits. Please try again in a moment.";
+      }
+      setAIFeedback(feedback);
     } finally {
       setLoading('idle');
     }
@@ -82,7 +168,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave 
         setAIFeedback(response.text);
     } catch(err) {
         console.error(err);
-        setAIFeedback('Failed to get feedback. Please try again.');
+        let feedback = 'Failed to get feedback. Please try again.';
+        if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+            feedback = "AI feedback failed due to high traffic. Please try again in a moment.";
+        }
+        setAIFeedback(feedback);
     } finally {
         setLoading('idle');
     }
@@ -136,7 +226,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave 
 
     } catch (err) {
         console.error("Report analysis failed:", err);
-        setReportAnalysis({ summary: "An error occurred during analysis. Please try again.", conditions: [] });
+        let analysis = { summary: "An error occurred during analysis. Please try again.", conditions: [] as string[] };
+        if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+            analysis.summary = "Report analysis failed due to high traffic. Please try again later.";
+        }
+        setReportAnalysis(analysis);
     } finally {
         setIsAnalyzingReport(false);
         if (e.target) e.target.value = '';
@@ -175,16 +269,48 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave 
           <button onClick={onClose} className="p-1 text-[var(--icon-color)] hover:text-[var(--text-primary)]"><CloseIcon className="w-6 h-6" /></button>
         </header>
         <div className="overflow-y-auto p-6 space-y-6">
+            {/* AI Persona Section */}
+            <section>
+                <div className={`p-4 rounded-xl flex items-center gap-4 ${isLight ? 'bg-rose-50' : 'bg-zinc-900/50'}`}>
+                    <div className="w-20 h-20 rounded-full bg-zinc-700 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                        {profile.aiAvatar ? (
+                            <img src={profile.aiAvatar} alt="AI Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                            <UserIcon className="w-10 h-10 text-zinc-500" />
+                        )}
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-xl font-bold text-[var(--text-primary)]">
+                            {profile.name || 'Your Name'}
+                            {profile.aiNickname && <span className="text-lg font-medium text-purple-400 ml-2">- {profile.aiNickname}</span>}
+                        </h3>
+                        <p className="text-sm text-[var(--text-secondary)] italic mt-1">
+                            {profile.aiSummary || 'Generate a persona to get a summary of your journey!'}
+                        </p>
+                    </div>
+                    <button
+                        onClick={handleGeneratePersona}
+                        disabled={isGeneratingPersona}
+                        className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 rounded-lg text-sm font-medium text-white disabled:bg-zinc-600 disabled:from-zinc-600 disabled:to-zinc-700 flex items-center gap-2"
+                        title="Generates an avatar, nickname, and summary based on your profile and recent activity."
+                    >
+                        {isGeneratingPersona ? <Spinner /> : '✨'}
+                        <span className="hidden sm:inline">{isGeneratingPersona ? 'Generating...' : 'Generate AI Persona'}</span>
+                    </button>
+                </div>
+            </section>
+
             {/* Vitals */}
             <section>
                 <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Your Vitals</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Name</label><input type="text" value={profile.name || ''} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} className={`w-full rounded-lg p-2 border ${inputClasses}`} placeholder="Your Name"/></div>
                     <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Age</label><input type="number" value={profile.age} onChange={e => setProfile(p => ({ ...p, age: Number(e.target.value) }))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
                     <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Weight (kg)</label><input type="number" value={profile.weight} onChange={e => setProfile(p => ({ ...p, weight: Number(e.target.value) }))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
                     <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Height (cm)</label><input type="number" value={profile.height} onChange={e => setProfile(p => ({ ...p, height: Number(e.target.value) }))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
                     <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Gender</label><select value={profile.gender} onChange={e => setProfile(p => ({ ...p, gender: e.target.value as any }))} className={`w-full rounded-lg p-2 border ${inputClasses}`}><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
                     <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Activity</label><select value={profile.activityLevel} onChange={e => setProfile(p => ({ ...p, activityLevel: e.target.value as any }))} className={`w-full rounded-lg p-2 border ${inputClasses}`}><option value="sedentary">Sedentary</option><option value="light">Light</option><option value="moderate">Moderate</option><option value="active">Active</option><option value="very_active">Very Active</option></select></div>
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Goal</label><select value={profile.goal} onChange={e => setProfile(p => ({ ...p, goal: e.target.value as any }))} className={`w-full rounded-lg p-2 border ${inputClasses}`}><option value="lose_weight">Lose Weight</option><option value="maintain">Maintain</option><option value="gain_muscle">Gain Muscle</option></select></div>
+                    <div className="col-span-2 md:col-span-1"><label className="block text-sm text-[var(--text-secondary)] mb-1">Goal</label><select value={profile.goal} onChange={e => setProfile(p => ({ ...p, goal: e.target.value as any }))} className={`w-full rounded-lg p-2 border ${inputClasses}`}><option value="lose_weight">Lose Weight</option><option value="maintain">Maintain</option><option value="gain_muscle">Gain Muscle</option></select></div>
                 </div>
             </section>
             

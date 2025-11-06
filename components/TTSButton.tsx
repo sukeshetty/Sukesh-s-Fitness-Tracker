@@ -72,6 +72,10 @@ const TTSButton: React.FC<TTSButtonProps> = ({ textToSpeak }) => {
 
     } catch (error) {
       console.error('TTS failed:', error);
+      if (error instanceof Error && (error.message.includes('quota') || error.message.includes('RESOURCE_EXHAUSTED'))) {
+        // Cannot set app-level error state here, so an alert is the most direct feedback.
+        alert("Audio generation failed due to high traffic. Please try again in a moment.");
+      }
       setStatus('idle');
     }
   };

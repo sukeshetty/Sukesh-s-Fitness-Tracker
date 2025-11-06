@@ -64,7 +64,11 @@ const DailySummaryHistory: React.FC<DailySummaryHistoryProps> = ({ isOpen, onClo
       const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: [{ parts: [{ text: prompt }] }] });
       setAiInsight(response.text);
     } catch (err) {
-      setAiInsight('Failed to generate AI insights. Please try again.');
+        let insight = 'Failed to generate AI insights. Please try again.';
+        if (err instanceof Error && (err.message.includes('quota') || err.message.includes('RESOURCE_EXHAUSTED'))) {
+            insight = "Could not generate insights due to high traffic. Please try again later.";
+        }
+        setAiInsight(insight);
     } finally {
       setGeneratingInsight(false);
     }

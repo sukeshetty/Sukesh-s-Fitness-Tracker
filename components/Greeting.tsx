@@ -1,5 +1,6 @@
 import React from 'react';
 import { CoachIcon, ScienceIcon, HourglassIcon, LightbulbIcon } from './Icons';
+import { UserProfile } from '../types';
 
 interface SuggestionCardProps {
   title: string;
@@ -25,6 +26,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ title, description, onC
 );
 
 interface GreetingProps {
+  userProfile: UserProfile | null;
   onOpenHeyCoach: () => void;
   onOpenDietAnalysis: () => void;
   onOpenFastingTracker: () => void;
@@ -32,6 +34,7 @@ interface GreetingProps {
 }
 
 const Greeting: React.FC<GreetingProps> = ({ 
+    userProfile,
     onOpenHeyCoach,
     onOpenDietAnalysis,
     onOpenFastingTracker,
@@ -64,11 +67,13 @@ const Greeting: React.FC<GreetingProps> = ({
     },
   ];
 
+  const displayName = userProfile?.aiNickname || userProfile?.name || 'there';
+
   return (
     <div className="flex flex-col items-center justify-center h-full w-full pb-20">
       <div className="text-center">
         <h1 className="text-5xl md:text-6xl font-medium bg-gradient-to-r from-blue-400 to-purple-400 text-transparent bg-clip-text mb-4">
-          Hello, there.
+          Hello, {displayName}.
         </h1>
         <p className="text-[var(--text-secondary)] text-xl">How can I help you today?</p>
       </div>
