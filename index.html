@@ -44,6 +44,11 @@
         transition: background 0.3s ease, color 0.3s ease;
       }
 
+      .h-screen {
+        height: 100vh; /* Fallback for browsers that do not support CSS variables */
+        height: calc(var(--vh, 1vh) * 100);
+      }
+
       @keyframes slideUp {
         from { opacity: 0; transform: translateY(10px); }
         to { opacity: 1; transform: translateY(0); }

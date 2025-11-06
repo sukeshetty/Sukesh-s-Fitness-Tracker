@@ -72,7 +72,12 @@ const FastingTracker: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ i
         planName: isStarting ? selectedPlan?.name || 'Open Fast' : null,
         targetHours: isStarting ? selectedPlan?.hours || null : null,
       };
-      localStorage.setItem(FASTING_STATE_KEY, JSON.stringify(newState));
+      try {
+        localStorage.setItem(FASTING_STATE_KEY, JSON.stringify(newState));
+      } catch (error) {
+        console.error("Failed to save fasting state to localStorage:", error);
+        // Optionally, show an error to the user.
+      }
       if (!newState.isActive) {
          setElapsedTime({ hours: 0, minutes: 0, seconds: 0 });
          setSelectedPlan(null);

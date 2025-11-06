@@ -117,6 +117,17 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, isE
 
   const isLoading = message.role === MessageRole.MODEL && !message.content && !message.nutritionData && !message.activityData;
   
+  useEffect(() => {
+    // This is a blob URL from an image upload. We must revoke it when the component
+    // is no longer in use to prevent a memory leak.
+    const isBlobUrl = message.imageUrl && message.imageUrl.startsWith('blob:');
+    if (isBlobUrl) {
+      return () => {
+        URL.revokeObjectURL(message.imageUrl!);
+      };
+    }
+  }, [message.imageUrl]);
+
   return (
     <div className={`group flex items-start gap-4 my-6 w-full ${isUser ? 'max-w-2xl flex-row-reverse' : 'max-w-4xl'}`}>
       <div className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center self-start">
@@ -197,4 +208,4 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, isE
   );
 };
 
-export default ChatMessageBubble;
+export default React.memo(ChatMessageBubble);

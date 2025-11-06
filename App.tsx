@@ -84,9 +84,9 @@ const parseModelResponse = (text: string): { nutritionData?: Ingredient[]; activ
                 if ('ingredient' in jsonData[0] && 'calories' in jsonData[0]) {
                     const normalizedData = jsonData.map((item: any) => ({
                         ...item,
-                        calories: Number(item.calories) || 0,
-                        protein: Number(item.protein) || 0,
-                        fat: Number(item.fat) || 0,
+                        calories: parseFloat(String(item.calories)) || 0,
+                        protein: parseFloat(String(item.protein)) || 0,
+                        fat: parseFloat(String(item.fat)) || 0,
                     }));
                     return { nutritionData: normalizedData, remainingText };
                 }
@@ -94,8 +94,8 @@ const parseModelResponse = (text: string): { nutritionData?: Ingredient[]; activ
                 if ('activity' in jsonData[0] && 'caloriesBurned' in jsonData[0]) {
                     const normalizedData = jsonData.map((item: any) => ({
                         ...item,
-                        duration: Number(item.duration) || 0,
-                        caloriesBurned: Number(item.caloriesBurned) || 0,
+                        duration: parseFloat(String(item.duration)) || 0,
+                        caloriesBurned: parseFloat(String(item.caloriesBurned)) || 0,
                         emoji: item.emoji || '💪',
                     }));
                     return { activityData: normalizedData, remainingText };
@@ -111,6 +111,43 @@ const parseModelResponse = (text: string): { nutritionData?: Ingredient[]; activ
 
     return { remainingText: text };
 };
+
+const compressImage = (file: File, quality = 0.7, maxWidth = 1024): Promise<File> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = event => {
+            const img = new Image();
+            img.src = event.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const scale = Math.min(1, maxWidth / img.width);
+                canvas.width = img.width * scale;
+                canvas.height = img.height * scale;
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject(new Error('Failed to get canvas context'));
+
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                canvas.toBlob(blob => {
+                    if (blob) {
+                        const newFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(newFile);
+                    } else {
+                        reject(new Error('Canvas to blob conversion failed'));
+                    }
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = reject;
+        };
+        reader.onerror = reject;
+    });
+};
+
 
 const calculateSimilarity = (str1: string, str2: string): number => {
   const longer = str1.length > str2.length ? str1 : str2;
@@ -154,6 +191,7 @@ const App: React.FC = () => {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [view, setView] = useState<View>('home');
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isReportsOpen, setIsReportsOpen] = useState(false);
@@ -186,6 +224,21 @@ const App: React.FC = () => {
         });
       });
     }
+    
+    const setVh = () => document.documentElement.style.setProperty('--vh', `${window.innerHeight * 0.01}px`);
+    window.addEventListener('resize', setVh);
+    setVh();
+
+    const handleOnline = () => { setIsOnline(true); setError(null); };
+    const handleOffline = () => { setIsOnline(false); setError("You are offline. Please check your connection."); };
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('resize', setVh);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
@@ -255,16 +308,21 @@ const App: React.FC = () => {
       },
     };
 
-    const saved = localStorage.getItem(DAILY_SUMMARIES_KEY);
-    const summaries: DailySummaryEntry[] = saved ? JSON.parse(saved) : [];
-    const existingIndex = summaries.findIndex((s) => s.date === dateToSave);
-    if (existingIndex >= 0) {
-      summaries[existingIndex] = summary;
-    } else {
-      summaries.push(summary);
+    try {
+      const saved = localStorage.getItem(DAILY_SUMMARIES_KEY);
+      const summaries: DailySummaryEntry[] = saved ? JSON.parse(saved) : [];
+      const existingIndex = summaries.findIndex((s) => s.date === dateToSave);
+      if (existingIndex >= 0) {
+        summaries[existingIndex] = summary;
+      } else {
+        summaries.push(summary);
+      }
+      localStorage.setItem(DAILY_SUMMARIES_KEY, JSON.stringify(summaries));
+      setAllDailySummaries(summaries);
+    } catch (e) {
+      console.error("Failed to save daily summary:", e);
+      setError("Failed to save progress. Your browser storage may be full.");
     }
-    localStorage.setItem(DAILY_SUMMARIES_KEY, JSON.stringify(summaries));
-    setAllDailySummaries(summaries);
   }, [userProfile]);
 
   useEffect(() => {
@@ -318,7 +376,6 @@ const App: React.FC = () => {
   const handleSendMessageInternal = async (userInput: string, date: string, imageUrl?: string) => {
     setView('chat');
     setError(null);
-    setLoadingState({ type: 'sending' });
 
     const timestamp = date 
         ? new Date(date + 'T' + new Date().toTimeString().split(' ')[0]).toISOString() 
@@ -326,6 +383,13 @@ const App: React.FC = () => {
   
     const userMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.USER, content: userInput, imageUrl, timestamp };
     const modelMessage: ChatMessage = { id: generateUniqueId(), role: MessageRole.MODEL, content: '', timestamp: new Date().toISOString() };
+    
+    if (!isOnline) {
+        setError("You are offline. Please check your connection.");
+        return;
+    }
+    
+    setLoadingState({ type: 'sending' });
     setMessages(prev => [...prev, userMessage, modelMessage]);
   
     try {
@@ -336,7 +400,9 @@ const App: React.FC = () => {
       );
     } catch (e) {
         let errorMessage = `Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`;
-        if (e instanceof Error && (e.message.includes('quota') || e.message.includes('RESOURCE_EXHAUSTED'))) {
+        if (!isOnline) {
+            errorMessage = "The request failed because you are offline.";
+        } else if (e instanceof Error && (e.message.includes('quota') || e.message.includes('RESOURCE_EXHAUSTED'))) {
             errorMessage = "I'm sorry, I'm experiencing high traffic right now. Please try sending your message again in a moment.";
         }
         setError(errorMessage);
@@ -378,10 +444,16 @@ const App: React.FC = () => {
 
   const handleImageForAnalysis = async (file: File, date: string) => {
     if (loadingState.type !== 'idle') return;
+    if (!isOnline) {
+      setError("You are offline. Please upload the image when you have a connection.");
+      return;
+    }
     setView('chat');
     setLoadingState({ type: 'sending' });
     setError(null);
-    const imageUrl = URL.createObjectURL(file);
+
+    const compressedFile = await compressImage(file);
+    const imageUrl = URL.createObjectURL(compressedFile);
     const timestamp = date 
         ? new Date(date + 'T' + new Date().toTimeString().split(' ')[0]).toISOString() 
         : new Date().toISOString();
@@ -390,7 +462,7 @@ const App: React.FC = () => {
 
     try {
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-        const imagePart = { inlineData: { data: await new Promise<string>(r => {const reader = new FileReader(); reader.onloadend = () => r((reader.result as string).split(',')[1]); reader.readAsDataURL(file);}), mimeType: file.type }};
+        const imagePart = { inlineData: { data: await new Promise<string>(r => {const reader = new FileReader(); reader.onloadend = () => r((reader.result as string).split(',')[1]); reader.readAsDataURL(compressedFile);}), mimeType: compressedFile.type }};
         const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: { parts: [ { text: "Describe the food items in this image for a nutrition log. Be descriptive and concise." }, imagePart ] } });
         const foodDescription = response.text;
         
@@ -421,20 +493,20 @@ const App: React.FC = () => {
         setError("Could not find the message to edit.");
         return;
     }
-    const modelMessage = originalMessages[userMessageIndex + 1];
     const originalUserMessage = originalMessages[userMessageIndex];
+    const originalModelMessage = originalMessages[userMessageIndex + 1];
     const messageDate = new Date(originalUserMessage.timestamp).toISOString().split('T')[0];
 
     const updatedMessages = [...originalMessages];
-    updatedMessages[userMessageIndex] = { ...updatedMessages[userMessageIndex], content: newContent, timestamp: new Date().toISOString() };
-    updatedMessages[userMessageIndex + 1] = { ...modelMessage, content: '', nutritionData: undefined, activityData: undefined };
+    updatedMessages[userMessageIndex] = { ...originalUserMessage, content: newContent, timestamp: new Date().toISOString() };
+    updatedMessages[userMessageIndex + 1] = { ...originalModelMessage, content: '', nutritionData: undefined, activityData: undefined };
     setMessages(updatedMessages);
 
     try {
       await streamModelResponse(
         newContent,
-        (modelResponse) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: modelResponse } : m)),
-        ({ nutritionData, activityData, remainingText }) => setMessages(prev => prev.map(m => m.id === modelMessage.id ? { ...m, content: remainingText ?? '', nutritionData, activityData } : m))
+        (modelResponse) => setMessages(prev => prev.map(m => m.id === originalModelMessage.id ? { ...m, content: modelResponse } : m)),
+        ({ nutritionData, activityData, remainingText }) => setMessages(prev => prev.map(m => m.id === originalModelMessage.id ? { ...m, content: remainingText ?? '', nutritionData, activityData } : m))
       );
     } catch (e) {
         let errorMessage = `Failed to get response: ${e instanceof Error ? e.message : "An unknown error occurred."}`;
@@ -442,7 +514,13 @@ const App: React.FC = () => {
             errorMessage = "I'm sorry, I'm experiencing high traffic right now. Please try sending your message again in a moment.";
         }
         setError(errorMessage);
-        setMessages(originalMessages);
+        setMessages(prev => {
+          const index = prev.findIndex(m => m.id === messageId);
+          if (index === -1) return prev;
+          const restored = [...prev];
+          restored.splice(index, 2, originalUserMessage, originalModelMessage);
+          return restored;
+        });
     } finally {
         setLoadingState({ type: 'idle' });
         saveDailySummary(messageDate);
