@@ -7,6 +7,8 @@ import DailySummaryView from './components/DailySummaryView';
 import Greeting from './components/Greeting';
 import { GeminiStarIcon, ChartBarIcon } from './components/Icons';
 import VideoGenerator from './components/VideoGenerator';
+import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { safeLocalStorage, StorageError } from './utils/storage';
 
 const SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
 
@@ -74,8 +76,17 @@ const parseNutritionResponse = (text: string): { nutritionData?: Ingredient[]; r
     if (match && match[1]) {
         try {
             const jsonData = JSON.parse(match[1]);
+
+            // Normalize to ensure numbers (fix type safety bug)
+            const normalizedData = jsonData.map((item: any) => ({
+              ...item,
+              calories: typeof item.calories === 'string' ? parseFloat(item.calories) || 0 : item.calories,
+              protein: typeof item.protein === 'string' ? parseFloat(item.protein) || 0 : item.protein,
+              fat: typeof item.fat === 'string' ? parseFloat(item.fat) || 0 : item.fat,
+            }));
+
             const remainingText = text.replace(jsonRegex, '').trim();
-            return { nutritionData: jsonData, remainingText };
+            return { nutritionData: normalizedData, remainingText };
         } catch (error) {
             console.error("Failed to parse nutrition JSON:", error);
             return { nutritionData: undefined, remainingText: text };
@@ -96,13 +107,27 @@ const App: React.FC = () => {
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  
+
   const [selectedImageForVideo, setSelectedImageForVideo] = useState<File | null>(null);
   const [showVideoGenerator, setShowVideoGenerator] = useState(false);
 
+  // Online/offline status detection
+  const isOnline = useOnlineStatus();
+
+  // Memory leak fix: Cleanup blob URLs
+  useEffect(() => {
+    return () => {
+      messages.forEach(msg => {
+        if (msg.imageUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(msg.imageUrl);
+        }
+      });
+    };
+  }, [messages]);
+
   useEffect(() => {
     try {
-        const saved = localStorage.getItem(SAVED_MEALS_KEY);
+        const saved = safeLocalStorage.getItem(SAVED_MEALS_KEY);
         if (saved) {
             setSavedMeals(JSON.parse(saved));
         }
@@ -113,9 +138,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     try {
-        localStorage.setItem(SAVED_MEALS_KEY, JSON.stringify(savedMeals));
+        safeLocalStorage.setItem(SAVED_MEALS_KEY, JSON.stringify(savedMeals));
     } catch (error) {
-        console.error("Could not save meals:", error);
+        if (error instanceof StorageError && error.isQuotaExceeded) {
+          setError('Storage is full. Please delete some saved meals or clear old data.');
+        } else {
+          console.error("Could not save meals:", error);
+        }
     }
   }, [savedMeals]);
 
@@ -261,15 +290,17 @@ const App: React.FC = () => {
         });
 
         const foodDescription = response.text;
-        
+
         setMessages(prev => prev.map(msg => msg.id === userMessage.id ? { ...msg, content: foodDescription } : msg));
-        
+
         await handleSendMessage(foodDescription);
 
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
         setError(`Image analysis failed: ${errorMessage}`);
         setMessages(prev => prev.filter(msg => msg.id !== userMessage.id));
+        // Fix: Cleanup blob URL on error
+        URL.revokeObjectURL(imageUrl);
         console.error(e);
     } finally {
         setLoadingState({ type: 'idle' });
@@ -288,6 +319,9 @@ const App: React.FC = () => {
     setLoadingState({ type: 'editing', id: messageId });
     setEditingMessageId(null);
 
+    // Fix: Capture original state BEFORE modifications
+    const originalMessages = [...messages];
+
     const userMessageIndex = messages.findIndex(msg => msg.id === messageId);
     if (userMessageIndex === -1) {
         setLoadingState({ type: 'idle' });
@@ -299,7 +333,7 @@ const App: React.FC = () => {
     const updatedMessages = [...messages];
     updatedMessages[userMessageIndex] = { ...updatedMessages[userMessageIndex], content: newContent, timestamp: new Date().toISOString() };
     updatedMessages[modelMessageIndex] = { id: generateUniqueId(), role: MessageRole.MODEL, content: '', timestamp: new Date().toISOString() };
-    
+
     setMessages(updatedMessages);
 
     try {
@@ -335,7 +369,8 @@ const App: React.FC = () => {
     } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
         setError(`Failed to get response: ${errorMessage}`);
-        setMessages(messages);
+        // Fix: Use captured original state instead of stale closure
+        setMessages(originalMessages);
         console.error(e);
     } finally {
         setLoadingState({ type: 'idle' });
@@ -413,7 +448,7 @@ const App: React.FC = () => {
         <div className="flex items-center gap-3">
             <h1 className="text-xl font-medium text-zinc-200">SukeshFIT</h1>
         </div>
-        <button 
+        <button
             onClick={() => setIsSummaryOpen(true)}
             className="p-2 text-zinc-400 hover:text-zinc-100 transition-colors"
             aria-label="Show daily summary"
@@ -421,7 +456,15 @@ const App: React.FC = () => {
             <ChartBarIcon className="w-6 h-6"/>
         </button>
       </header>
-      
+
+      {/* Offline Indicator */}
+      {!isOnline && (
+        <div className="bg-yellow-500/20 text-yellow-300 px-4 py-2 text-center text-sm border-b border-yellow-500/30">
+          <span className="font-semibold">⚠️ You are offline</span>
+          <span className="ml-2">Some features may not work properly</span>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col w-full">
         <main className="flex-1 overflow-y-auto px-4 md:px-6">
             <div className="max-w-4xl mx-auto w-full h-full">

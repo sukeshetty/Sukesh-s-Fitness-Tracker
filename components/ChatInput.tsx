@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { SendIcon, BookmarkIcon, TrashIcon, PaperclipIcon } from './Icons';
 import Spinner from './Spinner';
 import { SavedMeal } from '../types';
+import { compressImage } from '../utils/imageCompression';
+import { haptics } from '../utils/haptics';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -25,6 +27,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim()) {
+      haptics.light(); // Add haptic feedback
       onSendMessage(input);
       setInput('');
     }
@@ -56,9 +59,29 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, handler: (file: File) => void) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, handler: (file: File) => void) => {
     if (e.target.files && e.target.files[0]) {
-        handler(e.target.files[0]);
+        const originalFile = e.target.files[0];
+
+        try {
+          // Compress image before sending
+          const compressedFile = await compressImage(originalFile, {
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.85,
+            maxSizeMB: 5
+          });
+
+          console.log(`📸 Image compressed: ${(originalFile.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+
+          haptics.success(); // Add haptic feedback for successful compression
+          handler(compressedFile);
+        } catch (error) {
+          console.error('Failed to compress image:', error);
+          haptics.error(); // Add haptic feedback for error
+          // Fallback to original file
+          handler(originalFile);
+        }
     }
     e.target.value = ''; // Reset file input
     setShowUploadOptions(false);
@@ -74,11 +97,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
                 <ul className="divide-y divide-zinc-700/50">
                     {savedMeals.map((meal) => (
                         <li key={meal.name} className="p-2 group flex justify-between items-center hover:bg-white/10 rounded-md transition-colors">
-                            <button onClick={() => { setInput(meal.content); setShowSavedMeals(false); textareaRef.current?.focus(); }} className="text-left flex-1" >
+                            <button onClick={() => { haptics.selection(); setInput(meal.content); setShowSavedMeals(false); textareaRef.current?.focus(); }} className="text-left flex-1" >
                                 <p className="font-semibold text-zinc-100">{meal.name}</p>
                                 <p className="text-sm text-zinc-400 truncate pr-2">{meal.content}</p>
                             </button>
-                            <button onClick={() => onDeleteSavedMeal(meal.name)} className="ml-4 p-1 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" title={`Delete "${meal.name}"`} aria-label={`Delete "${meal.name}"`} >
+                            <button onClick={() => { haptics.medium(); onDeleteSavedMeal(meal.name); }} className="ml-4 p-1 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity" title={`Delete "${meal.name}"`} aria-label={`Delete "${meal.name}"`} >
                                 <TrashIcon className="w-4 h-4" />
                             </button>
                         </li>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { GeminiStarIcon } from './Icons';
+import { haptics } from '../utils/haptics';
 
 interface SuggestionCardProps {
   title: string;
@@ -12,6 +13,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ title, description, onC
     onClick={(e) => {
       e.preventDefault();
       console.log('💡 Suggestion card clicked:', title);
+      haptics.medium(); // Add haptic feedback
       onClick();
     }}
     className="bg-white/5 backdrop-blur-lg p-4 rounded-xl w-full text-left hover:bg-white/10 transition-colors border border-white/10 cursor-pointer"
