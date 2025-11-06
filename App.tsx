@@ -132,6 +132,7 @@ const App: React.FC = () => {
   useEffect(() => {
     const initializeChat = () => {
       try {
+        console.log('🔑 Initializing chat with API key:', process.env.API_KEY ? 'Key present ✅' : 'Key missing ❌');
         if (!process.env.API_KEY) {
           throw new Error("API_KEY environment variable not set.");
         }
@@ -156,8 +157,13 @@ const App: React.FC = () => {
   }, []);
 
   const handleSendMessage = useCallback(async (userInput: string, imageUrl?: string) => {
-    if (!userInput.trim()) return;
-  
+    console.log('🚀 handleSendMessage called with:', userInput);
+
+    if (!userInput.trim()) {
+      console.log('⚠️ Empty input, returning');
+      return;
+    }
+
     const normalizedInput = userInput.trim().toLowerCase();
     const isDuplicate = messages.some(
       (msg) => msg.role === MessageRole.USER && msg.content.trim().toLowerCase() === normalizedInput && !msg.imageUrl

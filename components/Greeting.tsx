@@ -9,8 +9,12 @@ interface SuggestionCardProps {
 
 const SuggestionCard: React.FC<SuggestionCardProps> = ({ title, description, onClick }) => (
   <button
-    onClick={onClick}
-    className="bg-white/5 backdrop-blur-lg p-4 rounded-xl w-full text-left hover:bg-white/10 transition-colors border border-white/10"
+    onClick={(e) => {
+      e.preventDefault();
+      console.log('💡 Suggestion card clicked:', title);
+      onClick();
+    }}
+    className="bg-white/5 backdrop-blur-lg p-4 rounded-xl w-full text-left hover:bg-white/10 transition-colors border border-white/10 cursor-pointer"
   >
     <p className="font-semibold text-zinc-200">{title}</p>
     <p className="text-sm text-zinc-400">{description}</p>
