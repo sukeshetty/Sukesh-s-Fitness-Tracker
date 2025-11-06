@@ -5,6 +5,7 @@ import { CloseIcon, LightbulbIcon, FireIcon, TargetIcon, RunIcon, SwapIcon, User
 import Spinner from './Spinner';
 import { useTheme } from './contexts/ThemeContext';
 import AnimatedNumber from './AnimatedNumber';
+import { triggerHapticFeedback } from '../utils/audio';
 
 interface WhatIfFoodProps {
   isOpen: boolean;
@@ -97,6 +98,7 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
 
   const handleAnalyzeImpact = async () => {
     if (!foodInput || !userProfile) return;
+    triggerHapticFeedback();
     setLoading(true);
     setAnalysisResult(null);
     setClarificationQuestion(null);
@@ -183,6 +185,7 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
   };
   
   const handleReset = () => {
+    triggerHapticFeedback();
     setFoodInput('');
     setAnalysisResult(null);
     setClarificationQuestion(null);
@@ -191,6 +194,7 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
   };
 
   const handleGoToProfile = () => {
+    triggerHapticFeedback();
     onClose();
     onOpenProfile();
   };

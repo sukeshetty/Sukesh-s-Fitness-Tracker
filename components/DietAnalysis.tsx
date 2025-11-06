@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify';
 import { DailySummaryEntry, UserProfile } from '../types';
 import { CloseIcon, ScienceIcon, UserIcon } from './Icons';
 import Spinner from './Spinner';
+import { triggerHapticFeedback } from '../utils/audio';
 
 interface DietAnalysisProps {
   isOpen: boolean;
@@ -19,6 +20,7 @@ const DietAnalysis: React.FC<DietAnalysisProps> = ({ isOpen, onClose, userProfil
   const [response, setResponse] = useState('');
 
   const handleAnalyzeDiet = async () => {
+    triggerHapticFeedback();
     if (!userProfile || allDailySummaries.length === 0) {
       setResponse("Not enough data to analyze. Please log some meals first.");
       return;
@@ -67,6 +69,7 @@ const DietAnalysis: React.FC<DietAnalysisProps> = ({ isOpen, onClose, userProfil
   const sanitizedMarkup = DOMPurify.sanitize(marked.parse(response) as string);
 
   const handleGoToProfile = () => {
+    triggerHapticFeedback();
     onClose();
     onOpenProfile();
   };

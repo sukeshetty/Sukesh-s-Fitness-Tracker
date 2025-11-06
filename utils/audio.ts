@@ -27,3 +27,14 @@ export async function decodeAudioData(
     }
     return buffer;
 }
+
+export const triggerHapticFeedback = (pattern: VibratePattern = 20): void => {
+  if (window.navigator && 'vibrate' in window.navigator) {
+    try {
+      window.navigator.vibrate(pattern);
+    } catch (e) {
+      // Vibration may be disabled by user settings.
+      console.log("Haptic feedback vibration failed.", e);
+    }
+  }
+};

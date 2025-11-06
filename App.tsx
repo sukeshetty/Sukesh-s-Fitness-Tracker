@@ -14,6 +14,7 @@ import DietAnalysis from './components/DietAnalysis';
 import FastingTracker from './components/FastingTracker';
 import WhatIfFood from './components/WhatIfFood';
 import DailySummaryHistory from './components/DailySummaryHistory';
+import { triggerHapticFeedback } from './utils/audio';
 
 const BASE_SYSTEM_INSTRUCTION = `You are a helpful and knowledgeable health coach. Your goal is to provide insightful nutritional feedback and encourage healthier choices in a supportive but witty manner.
 
@@ -174,6 +175,18 @@ const App: React.FC = () => {
   const chatSessionRef = useRef<Chat | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messagesRef = useRef(messages);
+
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/service-worker.js').then(registration => {
+          console.log('SW registered: ', registration);
+        }).catch(registrationError => {
+          console.log('SW registration failed: ', registrationError);
+        });
+      });
+    }
+  }, []);
 
   useEffect(() => { messagesRef.current = messages; }, [messages]);
 
@@ -463,13 +476,13 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen bg-transparent text-zinc-200 font-sans">
       <header className="bg-[var(--glass-bg)] backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-[var(--glass-border)]">
         <div className="flex items-center gap-2">
-            <button onClick={() => setView('home')} title="Home" className="p-2 text-[var(--icon-color)] hover:text-green-500 transition-colors"><HomeIcon className="w-6 h-6"/></button>
+            <button onClick={() => { setView('home'); triggerHapticFeedback(); }} title="Home" className="p-2 text-[var(--icon-color)] hover:text-green-500 transition-colors"><HomeIcon className="w-6 h-6"/></button>
             <h1 className="text-xl font-medium text-[var(--text-primary)]">SukeshFIT</h1>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
-            <button onClick={() => setIsHistoryOpen(true)} title="Daily Log History" className="p-2 text-[var(--icon-color)] hover:text-cyan-500 transition-colors"><CalendarIcon className="w-6 h-6"/></button>
-            <button onClick={() => setIsReportsOpen(true)} title="Weekly/Monthly Reports" className="p-2 text-[var(--icon-color)] hover:text-rose-500 transition-colors"><ChartBarIcon className="w-6 h-6"/></button>
-            <button onClick={() => setIsProfileOpen(true)} title="Profile" className="p-2 text-[var(--icon-color)] hover:text-fuchsia-500 transition-colors"><UserIcon className="w-6 h-6"/></button>
+            <button onClick={() => { setIsHistoryOpen(true); triggerHapticFeedback(); }} title="Daily Log History" className="p-2 text-[var(--icon-color)] hover:text-cyan-500 transition-colors"><CalendarIcon className="w-6 h-6"/></button>
+            <button onClick={() => { setIsReportsOpen(true); triggerHapticFeedback(); }} title="Weekly/Monthly Reports" className="p-2 text-[var(--icon-color)] hover:text-rose-500 transition-colors"><ChartBarIcon className="w-6 h-6"/></button>
+            <button onClick={() => { setIsProfileOpen(true); triggerHapticFeedback(); }} title="Profile" className="p-2 text-[var(--icon-color)] hover:text-fuchsia-500 transition-colors"><UserIcon className="w-6 h-6"/></button>
             <ThemeToggle />
         </div>
       </header>

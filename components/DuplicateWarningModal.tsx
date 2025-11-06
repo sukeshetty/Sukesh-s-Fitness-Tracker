@@ -1,4 +1,5 @@
 import React from 'react';
+import { triggerHapticFeedback } from '../utils/audio';
 
 interface DuplicateWarningModalProps {
   isOpen: boolean;
@@ -16,6 +17,11 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
   onCancel,
 }) => {
   if (!isOpen) return null;
+  
+  const handleConfirmClick = () => {
+    triggerHapticFeedback([30, 50, 30]);
+    onConfirm();
+  };
 
   return (
     <div 
@@ -55,7 +61,7 @@ const DuplicateWarningModal: React.FC<DuplicateWarningModalProps> = ({
               Cancel
             </button>
             <button
-              onClick={onConfirm}
+              onClick={handleConfirmClick}
               className="flex-1 px-4 py-2.5 rounded-lg bg-yellow-500 hover:bg-yellow-400 text-black font-semibold transition-colors"
             >
               Log Anyway

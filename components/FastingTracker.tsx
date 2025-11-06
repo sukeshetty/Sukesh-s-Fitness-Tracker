@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { FastingState } from '../types';
 import { CloseIcon, HourglassIcon } from './Icons';
 import { useTheme } from './contexts/ThemeContext';
+import { triggerHapticFeedback } from '../utils/audio';
 
 const FASTING_STATE_KEY = 'gemini-food-copilot-fasting-state';
 
@@ -62,6 +63,7 @@ const FastingTracker: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ i
   }, [fastingState]);
   
   const handleToggleFast = () => {
+    triggerHapticFeedback(50);
     setFastingState(prevState => {
       const isStarting = !prevState.isActive;
       const newState: FastingState = {
@@ -77,6 +79,11 @@ const FastingTracker: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ i
       }
       return newState;
     });
+  };
+  
+  const handleSelectPlan = (plan: Plan) => {
+    triggerHapticFeedback(15);
+    setSelectedPlan(plan);
   };
   
   const currentPhase = useMemo(() => {
@@ -130,7 +137,7 @@ const FastingTracker: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ i
                   <h4 className={`font-bold mb-2 ${isLight ? 'text-rose-700' : 'text-zinc-300'}`}>{category}</h4>
                   <div className="grid grid-cols-2 gap-3">
                     {plans.map(plan => (
-                      <button key={plan.name} onClick={() => setSelectedPlan(plan)} className={`p-4 rounded-lg text-left transition-all ${selectedPlan?.name === plan.name ? 'ring-2 ring-yellow-400 bg-yellow-400/20' : (isLight ? 'bg-rose-100 hover:bg-rose-200' : 'bg-white/5 hover:bg-white/10')}`}>
+                      <button key={plan.name} onClick={() => handleSelectPlan(plan)} className={`p-4 rounded-lg text-left transition-all ${selectedPlan?.name === plan.name ? 'ring-2 ring-yellow-400 bg-yellow-400/20' : (isLight ? 'bg-rose-100 hover:bg-rose-200' : 'bg-white/5 hover:bg-white/10')}`}>
                         <p className={`font-semibold ${isLight ? 'text-rose-800' : 'text-white'}`}>{plan.name}</p>
                         <p className="text-xs text-[var(--text-secondary)]">{plan.description}</p>
                       </button>

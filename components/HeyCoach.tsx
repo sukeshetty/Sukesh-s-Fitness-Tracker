@@ -6,6 +6,7 @@ import { DailySummaryEntry, UserProfile } from '../types';
 import { CloseIcon, CoachIcon, SendIcon, ClipboardListIcon, LightbulbIcon, UserIcon } from './Icons';
 import Spinner from './Spinner';
 import { useTheme } from './contexts/ThemeContext';
+import { triggerHapticFeedback } from '../utils/audio';
 
 interface HeyCoachProps {
   isOpen: boolean;
@@ -84,6 +85,7 @@ const HeyCoach: React.FC<HeyCoachProps> = ({ isOpen, onClose, userProfile, daily
 
   const handleSendMessage = async (messageText: string) => {
     if (!messageText.trim() || !userProfile) return;
+    triggerHapticFeedback();
     setLoading(true);
     setInput('');
     setConversation(prev => [...prev, { role: 'user', content: messageText }]);
@@ -142,6 +144,7 @@ const HeyCoach: React.FC<HeyCoachProps> = ({ isOpen, onClose, userProfile, daily
   if (!isOpen) return null;
 
   const handleGoToProfile = () => {
+    triggerHapticFeedback();
     onClose();
     onOpenProfile();
   };

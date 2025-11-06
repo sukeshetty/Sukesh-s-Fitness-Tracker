@@ -4,6 +4,7 @@ import { UserProfile, DailyTargets, DailySummaryEntry } from '../types';
 import Spinner from './Spinner';
 import { CloseIcon, UserIcon } from './Icons';
 import { useTheme } from './contexts/ThemeContext';
+import { triggerHapticFeedback } from '../utils/audio';
 
 interface ProfilePageProps {
   onClose: () => void;
@@ -47,6 +48,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
   }, [userProfile]);
 
   const handleGeneratePersona = async () => {
+    triggerHapticFeedback();
     if (!profile.name?.trim()) {
         setAIFeedback("Please enter your name first to generate a persona.");
         return;
@@ -126,6 +128,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
   };
 
   const calculateAITargets = async () => {
+    triggerHapticFeedback();
     setLoading('calculating');
     setAIFeedback(null);
     try {
@@ -155,6 +158,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
   };
 
   const validateGoalAdjustment = async () => {
+    triggerHapticFeedback();
     setLoading('validating');
     setAIFeedback(null);
     try {
@@ -243,6 +247,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
   };
 
   const handleAddCondition = () => {
+    triggerHapticFeedback();
     if (newCondition.trim() && !profile.healthConditions.includes(newCondition.trim())) {
       setProfile(p => ({ ...p, healthConditions: [...p.healthConditions, newCondition.trim()] }));
       setNewCondition('');
@@ -250,7 +255,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
   };
 
   const handleRemoveCondition = (condition: string) => {
+    triggerHapticFeedback(10);
     setProfile(p => ({ ...p, healthConditions: p.healthConditions.filter(c => c !== condition) }));
+  };
+  
+  const handleSaveClick = () => {
+    triggerHapticFeedback([50, 50, 50]);
+    onSave(profile);
   };
   
   const inputClasses = isLight 
@@ -339,7 +350,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
             <section>
                 <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Health Conditions</h3>
                 <input type="file" ref={reportFileInputRef} onChange={handleReportUpload} accept="image/*,application/pdf" className="hidden" />
-                <button onClick={() => reportFileInputRef.current?.click()} disabled={isAnalyzingReport} className="w-full mb-4 py-2.5 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2 disabled:bg-zinc-600">
+                <button onClick={() => { reportFileInputRef.current?.click(); triggerHapticFeedback(); }} disabled={isAnalyzingReport} className="w-full mb-4 py-2.5 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2 disabled:bg-zinc-600">
                     {isAnalyzingReport ? <Spinner /> : '📄 Upload & Analyze Health Report'}
                 </button>
                 {isAnalyzingReport && <p className="text-center text-[var(--text-secondary)] text-sm my-2">Analyzing report... This may take a moment.</p>}
@@ -364,7 +375,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
             </section>
         </div>
         <footer className="p-4 border-t border-[var(--glass-border)]">
-          <button onClick={() => onSave(profile)} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white text-lg">Save Profile</button>
+          <button onClick={handleSaveClick} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white text-lg">Save Profile</button>
         </footer>
       </div>
     </div>

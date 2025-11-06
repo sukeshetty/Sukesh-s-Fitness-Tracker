@@ -1,0 +1,21 @@
+{
+  "short_name": "SukeshFIT",
+  "name": "SukeshFIT: Your AI Nutrition Co-pilot",
+  "description": "A one-page PWA app where users can enter information about food they have consumed, and Gemini provides insightful feedback, acting as a personal nutrition co-pilot.",
+  "icons": [
+    {
+      "src": "https://www.gstatic.com/a/ai/logos/lamda_magic_wand_192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "https://www.gstatic.com/a/ai/logos/lamda_magic_wand_512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#131314",
+  "background_color": "#131314"
+}
