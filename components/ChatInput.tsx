@@ -106,7 +106,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
           bg-[var(--glass-bg)] backdrop-blur-xl
           rounded-3xl border border-[var(--glass-border)]
           transition-all duration-300 ease-in-out
-          ${isFocused ? 'ring-2 ring-blue-500/50' : ''}
+          ${isFocused ? 'ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/20' : ''}
           grid grid-cols-[auto_1fr_auto] items-end gap-x-1 p-1
         `}
       >
@@ -154,7 +154,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
         <div className="grid min-w-0" style={{'gridTemplateColumns': '100%'}}>
             {/* Invisible div for sizing */}
             <div
-                className="invisible whitespace-pre-wrap break-words [grid-area:1/1] p-2.5"
+                className={`invisible whitespace-pre-wrap break-words [grid-area:1/1] p-2.5 ${isFocused ? 'min-h-[80px]' : 'min-h-0'}`}
                 aria-hidden="true"
             >
                 {input}{' '}
@@ -167,7 +167,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
                 onBlur={() => setIsFocused(false)}
                 placeholder={`Log for ${getRelativeDateString(logDate)}...`}
                 rows={1}
-                className="[grid-area:1/1] w-full bg-transparent border-none focus:ring-0 resize-none placeholder-[var(--text-secondary)] text-[var(--text-primary)] p-2.5 max-h-48 overflow-y-auto"
+                className={`[grid-area:1/1] w-full bg-transparent border-none focus:ring-0 resize-none placeholder-[var(--text-secondary)] text-[var(--text-primary)] p-2.5 overflow-y-auto transition-all duration-300 ${isFocused ? 'min-h-[80px] max-h-[320px]' : 'max-h-48'}`}
                 disabled={isSubmitting}
             />
         </div>
