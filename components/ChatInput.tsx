@@ -17,12 +17,10 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const { theme } = useTheme();
   
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const analysisFileRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
-  
   const [isFocused, setIsFocused] = useState(false);
-
+  
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (input.trim()) {
@@ -38,14 +36,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
       handleSubmit(e);
     }
   };
-
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      const scrollHeight = textareaRef.current.scrollHeight;
-      textareaRef.current.style.height = `${scrollHeight}px`;
-    }
-  }, [input]);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -55,7 +45,6 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
     if(e.target) e.target.value = ''; // Reset file input
   }
 
-  // Handle clicks outside the date picker to close it
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
         const toggleButton = (event.target as HTMLElement).closest('.date-picker-toggle');
@@ -114,24 +103,26 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
       <form
         onSubmit={handleSubmit}
         className={`
-          flex items-end bg-[var(--glass-bg)] backdrop-blur-xl
-          rounded-3xl shadow-lg border border-[var(--glass-border)]
+          bg-[var(--glass-bg)] backdrop-blur-xl
+          rounded-3xl border border-[var(--glass-border)]
           transition-all duration-300 ease-in-out
           ${isFocused ? 'ring-2 ring-blue-500/50' : ''}
+          grid grid-cols-[auto_1fr_auto] items-end gap-x-1 p-1
         `}
       >
-        <div className="flex items-center pl-2">
+        {/* Left Icons */}
+        <div className="flex items-center self-end">
             <input type="file" accept="image/*" ref={analysisFileRef} onChange={handleFileChange} className="hidden" />
             <button
               type="button"
               onClick={() => { analysisFileRef.current?.click(); triggerHapticFeedback(15); }}
-              className="text-[var(--icon-color)] hover:text-[var(--text-primary)] p-3 rounded-full hover:bg-white/10 transition-colors"
+              className="text-[var(--icon-color)] hover:text-[var(--text-primary)] p-2.5 rounded-full hover:bg-white/10 transition-colors"
               aria-label="Upload photo for analysis"
             >
               <PaperclipIcon className="w-5 h-5" />
             </button>
             <div className="relative">
-                 {isDatePickerOpen && (
+                {isDatePickerOpen && (
                     <div ref={datePickerRef} className="absolute bottom-full mb-2 w-64 bg-[var(--component-bg)] backdrop-blur-xl rounded-xl ring-1 ring-[var(--glass-border)] shadow-lg p-3 animate-slideUp z-10">
                         <div className="grid grid-cols-2 gap-2 mb-2">
                             <button type="button" onClick={() => handleDateSelect(new Date().toISOString().split('T')[0])} className={`text-sm w-full text-center py-2 rounded-lg transition-colors ${quickDateButtonClasses}`}>Today</button>
@@ -151,29 +142,38 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
                 <button
                     type="button"
                     onClick={() => { setIsDatePickerOpen(prev => !prev); triggerHapticFeedback(15); }}
-                    className="date-picker-toggle text-[var(--icon-color)] hover:text-[var(--text-primary)] p-3 rounded-full hover:bg-white/10 transition-colors flex items-center gap-1.5"
+                    className="date-picker-toggle text-[var(--icon-color)] hover:text-[var(--text-primary)] p-2.5 rounded-full hover:bg-white/10 transition-colors flex items-center gap-1.5"
                     aria-label="Select log date"
                 >
                     <CalendarIcon className="w-5 h-5" />
-                    <span className="text-xs font-medium">{getRelativeDateString(logDate)}</span>
                 </button>
             </div>
         </div>
         
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          placeholder="Enter a food log or activity..."
-          rows={1}
-          className="flex-1 bg-transparent border-none focus:ring-0 resize-none placeholder-[var(--text-secondary)] text-[var(--text-primary)] py-3.5 max-h-48 overflow-y-auto"
-          disabled={isSubmitting}
-        />
+        {/* Auto-growing Textarea */}
+        <div className="grid min-w-0" style={{'gridTemplateColumns': '100%'}}>
+            {/* Invisible div for sizing */}
+            <div
+                className="invisible whitespace-pre-wrap break-words [grid-area:1/1] p-2.5"
+                aria-hidden="true"
+            >
+                {input}{' '}
+            </div>
+            <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder={`Log for ${getRelativeDateString(logDate)}...`}
+                rows={1}
+                className="[grid-area:1/1] w-full bg-transparent border-none focus:ring-0 resize-none placeholder-[var(--text-secondary)] text-[var(--text-primary)] p-2.5 max-h-48 overflow-y-auto"
+                disabled={isSubmitting}
+            />
+        </div>
         
-        <div className={`p-2 transition-all duration-200 ${hasContent ? 'opacity-100' : 'opacity-0 -translate-x-2 pointer-events-none'}`}>
+        {/* Send Button */}
+        <div className={`self-end transition-all duration-200 ease-in-out p-1 ${hasContent ? 'scale-100 opacity-100' : 'scale-75 opacity-0 pointer-events-none'}`}>
           <button
             type="submit"
             disabled={isSubmitting || !hasContent}
