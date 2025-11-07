@@ -15,33 +15,46 @@ const createGradientSVG = (colors: string[], emoji: string) => {
       <text x="100" y="120" font-size="80" text-anchor="middle" fill="white">${emoji}</text>
     </svg>
   `;
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
+  // Encode to base64 - only works in browser
+  if (typeof btoa !== 'undefined') {
+    return `data:image/svg+xml;base64,${btoa(svg)}`;
+  }
+  // Fallback: URL encode the SVG
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
-// Pre-generated images for different times of day
-export const TIME_BASED_IMAGES = {
-  earlyMorning: createGradientSVG(['#667eea', '#764ba2'], '🌅'), // 5 AM - 8 AM
-  midMorning: createGradientSVG(['#f093fb', '#f5576c'], '☀️'),   // 8 AM - 12 PM
-  afternoon: createGradientSVG(['#4facfe', '#00f2fe'], '🌤️'),    // 12 PM - 5 PM
-  evening: createGradientSVG(['#fa709a', '#fee140'], '🌆'),      // 5 PM - 8 PM
-  night: createGradientSVG(['#30cfd0', '#330867'], '🌙'),         // 8 PM - 5 AM
+// Lazy initialization - only create images when needed (in browser)
+let imagesCache: any = null;
+
+const getTimeBasedImages = () => {
+  if (!imagesCache) {
+    imagesCache = {
+      earlyMorning: createGradientSVG(['#667eea', '#764ba2'], '🌅'), // 5 AM - 8 AM
+      midMorning: createGradientSVG(['#f093fb', '#f5576c'], '☀️'),   // 8 AM - 12 PM
+      afternoon: createGradientSVG(['#4facfe', '#00f2fe'], '🌤️'),    // 12 PM - 5 PM
+      evening: createGradientSVG(['#fa709a', '#fee140'], '🌆'),      // 5 PM - 8 PM
+      night: createGradientSVG(['#30cfd0', '#330867'], '🌙'),         // 8 PM - 5 AM
+    };
+  }
+  return imagesCache;
 };
 
 // Get image based on current time
 export const getImageForTime = (timestamp?: string): string => {
+  const images = getTimeBasedImages();
   const date = timestamp ? new Date(timestamp) : new Date();
   const hour = date.getHours();
 
   if (hour >= 5 && hour < 8) {
-    return TIME_BASED_IMAGES.earlyMorning;
+    return images.earlyMorning;
   } else if (hour >= 8 && hour < 12) {
-    return TIME_BASED_IMAGES.midMorning;
+    return images.midMorning;
   } else if (hour >= 12 && hour < 17) {
-    return TIME_BASED_IMAGES.afternoon;
+    return images.afternoon;
   } else if (hour >= 17 && hour < 20) {
-    return TIME_BASED_IMAGES.evening;
+    return images.evening;
   } else {
-    return TIME_BASED_IMAGES.night;
+    return images.night;
   }
 };
 
