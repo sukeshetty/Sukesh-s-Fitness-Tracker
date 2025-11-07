@@ -5,6 +5,7 @@ import Spinner from './Spinner';
 import { CloseIcon, UserIcon } from './Icons';
 import { useTheme } from './contexts/ThemeContext';
 import { triggerHapticFeedback } from '../utils/audio';
+import { getImageForTime } from '../utils/timeBasedImages';
 
 interface ProfilePageProps {
   onClose: () => void;
@@ -137,30 +138,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
             summary = parsed.summary;
         }
 
-        // --- Image Generation (Sequential Call 2) ---
-        const goalThemes: { [key: string]: string } = {
-            lose_weight: 'fitness and health',
-            maintain: 'balance and wellness',
-            gain_muscle: 'strength and power',
-        };
-        const imagePrompt = `A motivational, minimalist vector art avatar. The avatar should represent a person focused on ${goalThemes[profile.goal]}. Clean lines, vibrant, inspiring, on a simple, non-distracting background.`;
-        
-        const imageResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash-image',
-            contents: { parts: [{ text: imagePrompt }] },
-            config: { responseModalities: [Modality.IMAGE] },
-        });
-
-        // Process image response
-        let avatarUrl = '';
-        for (const part of imageResponse.candidates[0].content.parts) {
-            if (part.inlineData) {
-                const base64ImageBytes: string = part.inlineData.data;
-                avatarUrl = `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
-            }
-        }
-        
-        if (!avatarUrl) throw new Error("Avatar generation failed.");
+        // --- Use Time-Based Pre-Generated Image (Cost Savings!) ---
+        // Instead of generating a new image each time, we reuse pre-generated images
+        // based on the time of day. This saves significant API costs.
+        const avatarUrl = getImageForTime();
 
         setProfile(p => ({
             ...p,

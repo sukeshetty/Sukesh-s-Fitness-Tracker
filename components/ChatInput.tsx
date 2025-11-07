@@ -160,11 +160,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
           rounded-3xl border border-[var(--glass-border)]
           transition-all duration-300 ease-in-out
           ${isFocused ? 'ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/20' : ''}
-          grid grid-cols-[1fr_auto] items-end gap-x-2 p-2
+          flex items-end gap-x-2 p-1.5
         `}
       >
         {/* Auto-growing Textarea */}
-        <div className="grid min-w-0" style={{'gridTemplateColumns': '100%'}}>
+        <div className="grid flex-1 min-w-0" style={{'gridTemplateColumns': '100%'}}>
             {/* Invisible div for sizing */}
             <div
                 className={`invisible whitespace-pre-wrap break-words [grid-area:1/1] p-2.5 ${isFocused ? 'min-h-[80px]' : 'min-h-0'}`}
@@ -186,11 +186,11 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
         </div>
         
         {/* Send Button */}
-        <div className={`self-end transition-all duration-200 ease-in-out p-1 ${hasContent ? 'scale-100 opacity-100' : 'scale-75 opacity-0 pointer-events-none'}`}>
+        <div className={`flex-shrink-0 transition-all duration-200 ease-in-out ${hasContent ? 'scale-100 opacity-100' : 'scale-75 opacity-0 pointer-events-none'}`}>
           <button
             type="submit"
             disabled={isSubmitting || !hasContent}
-            className="bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:cursor-not-allowed text-white font-bold w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200"
+            className="bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:cursor-not-allowed text-white font-bold w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200"
             aria-label="Send message"
           >
             {isSending ? <Spinner /> : <SendIcon className="w-5 h-5" />}
