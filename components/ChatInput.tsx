@@ -99,7 +99,60 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
     : 'bg-white/5 hover:bg-white/10 text-[var(--text-primary)]';
   
   return (
-    <div>
+    <div className="space-y-3">
+      {/* Icons Row - Above the input */}
+      <div className="flex items-center justify-between px-2">
+        <div className="flex items-center gap-2">
+          {/* Attachment Icon */}
+          <input type="file" accept="image/*" ref={analysisFileRef} onChange={handleFileChange} className="hidden" />
+          <button
+            type="button"
+            onClick={() => { analysisFileRef.current?.click(); triggerHapticFeedback(15); }}
+            className="text-[var(--icon-color)] hover:text-[var(--text-primary)] p-2 rounded-full hover:bg-white/10 transition-colors"
+            aria-label="Upload photo for analysis"
+            title="Upload food photo"
+          >
+            <PaperclipIcon className="w-5 h-5" />
+          </button>
+
+          {/* Date Picker Icon */}
+          <div className="relative">
+            {isDatePickerOpen && (
+              <div ref={datePickerRef} className="absolute bottom-full mb-2 w-64 bg-[var(--component-bg)] backdrop-blur-xl rounded-xl ring-1 ring-[var(--glass-border)] shadow-lg p-3 animate-slideUp z-10">
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <button type="button" onClick={() => handleDateSelect(new Date().toISOString().split('T')[0])} className={`text-sm w-full text-center py-2 rounded-lg transition-colors ${quickDateButtonClasses}`}>Today</button>
+                  <button type="button" onClick={() => handleDateSelect(getYesterdayISO())} className={`text-sm w-full text-center py-2 rounded-lg transition-colors ${quickDateButtonClasses}`}>Yesterday</button>
+                </div>
+                <label className="block text-xs text-[var(--text-secondary)] mb-1 px-1">Select another date</label>
+                <input
+                  type="date"
+                  value={logDate}
+                  onChange={(e) => handleDateSelect(e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
+                  className={`w-full rounded-lg p-2 text-sm border ${dateInputClasses}`}
+                  aria-label="Select log date"
+                />
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => { setIsDatePickerOpen(prev => !prev); triggerHapticFeedback(15); }}
+              className="date-picker-toggle text-[var(--icon-color)] hover:text-[var(--text-primary)] p-2 rounded-full hover:bg-white/10 transition-colors flex items-center gap-1.5"
+              aria-label="Select log date"
+              title={`Logging for ${getRelativeDateString(logDate)}`}
+            >
+              <CalendarIcon className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Date Display */}
+        <span className="text-xs text-[var(--text-secondary)]">
+          {getRelativeDateString(logDate)}
+        </span>
+      </div>
+
+      {/* Input Form */}
       <form
         onSubmit={handleSubmit}
         className={`
@@ -107,49 +160,9 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
           rounded-3xl border border-[var(--glass-border)]
           transition-all duration-300 ease-in-out
           ${isFocused ? 'ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/20' : ''}
-          grid grid-cols-[auto_1fr_auto] items-end gap-x-1 p-1
+          grid grid-cols-[1fr_auto] items-end gap-x-2 p-2
         `}
       >
-        {/* Left Icons */}
-        <div className="flex items-center self-end">
-            <input type="file" accept="image/*" ref={analysisFileRef} onChange={handleFileChange} className="hidden" />
-            <button
-              type="button"
-              onClick={() => { analysisFileRef.current?.click(); triggerHapticFeedback(15); }}
-              className="text-[var(--icon-color)] hover:text-[var(--text-primary)] p-2.5 rounded-full hover:bg-white/10 transition-colors"
-              aria-label="Upload photo for analysis"
-            >
-              <PaperclipIcon className="w-5 h-5" />
-            </button>
-            <div className="relative">
-                {isDatePickerOpen && (
-                    <div ref={datePickerRef} className="absolute bottom-full mb-2 w-64 bg-[var(--component-bg)] backdrop-blur-xl rounded-xl ring-1 ring-[var(--glass-border)] shadow-lg p-3 animate-slideUp z-10">
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                            <button type="button" onClick={() => handleDateSelect(new Date().toISOString().split('T')[0])} className={`text-sm w-full text-center py-2 rounded-lg transition-colors ${quickDateButtonClasses}`}>Today</button>
-                            <button type="button" onClick={() => handleDateSelect(getYesterdayISO())} className={`text-sm w-full text-center py-2 rounded-lg transition-colors ${quickDateButtonClasses}`}>Yesterday</button>
-                        </div>
-                        <label className="block text-xs text-[var(--text-secondary)] mb-1 px-1">Select another date</label>
-                        <input
-                            type="date"
-                            value={logDate}
-                            onChange={(e) => handleDateSelect(e.target.value)}
-                            max={new Date().toISOString().split('T')[0]}
-                            className={`w-full rounded-lg p-2 text-sm border ${dateInputClasses}`}
-                            aria-label="Select log date"
-                        />
-                    </div>
-                )}
-                <button
-                    type="button"
-                    onClick={() => { setIsDatePickerOpen(prev => !prev); triggerHapticFeedback(15); }}
-                    className="date-picker-toggle text-[var(--icon-color)] hover:text-[var(--text-primary)] p-2.5 rounded-full hover:bg-white/10 transition-colors flex items-center gap-1.5"
-                    aria-label="Select log date"
-                >
-                    <CalendarIcon className="w-5 h-5" />
-                </button>
-            </div>
-        </div>
-        
         {/* Auto-growing Textarea */}
         <div className="grid min-w-0" style={{'gridTemplateColumns': '100%'}}>
             {/* Invisible div for sizing */}
@@ -165,7 +178,7 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
                 onKeyDown={handleKeyDown}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
-                placeholder={`Log for ${getRelativeDateString(logDate)}...`}
+                placeholder="What did you eat? (e.g., 2 eggs, whole wheat toast, coffee...)"
                 rows={1}
                 className={`[grid-area:1/1] w-full bg-transparent border-none focus:ring-0 resize-none placeholder-[var(--text-secondary)] text-[var(--text-primary)] p-2.5 overflow-y-auto transition-all duration-300 ${isFocused ? 'min-h-[80px] max-h-[320px]' : 'max-h-48'}`}
                 disabled={isSubmitting}

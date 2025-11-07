@@ -549,7 +549,14 @@ const App: React.FC = () => {
     return Object.entries(groups).sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime());
   }, [messages]);
 
-  useEffect(() => { if (!editingMessageId) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [groupedMessages, editingMessageId]);
+  useEffect(() => {
+    if (!editingMessageId && messages.length > 0) {
+      // Use requestAnimationFrame to avoid scroll conflicts
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      });
+    }
+  }, [messages.length, editingMessageId]);
 
   return (
     <div className="flex flex-col h-screen bg-transparent text-zinc-200 font-sans">
