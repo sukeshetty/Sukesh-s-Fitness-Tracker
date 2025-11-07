@@ -566,7 +566,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 md:px-6 pt-4">
+      <main className="flex-1 overflow-y-auto px-4 md:px-6 pt-16">
         <div className="max-w-4xl mx-auto w-full h-full">
           {view === 'home' ? (
             <Greeting
