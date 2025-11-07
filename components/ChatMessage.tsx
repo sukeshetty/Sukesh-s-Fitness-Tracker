@@ -135,7 +135,18 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, isE
       </div>
       
       <div className={`flex-1 flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1 min-w-0`}>
-         <p className={`w-full font-semibold text-[var(--text-primary)] text-md ${isUser ? 'text-right' : 'text-left'}`}>{isUser ? 'You' : 'SukeshFIT'}</p>
+        <div className={`w-full flex items-center gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
+          <p className={`font-semibold text-[var(--text-primary)] text-md`}>{isUser ? 'You' : 'SukeshFIT'}</p>
+          <span className="text-xs text-[var(--text-secondary)]">
+            {new Date(message.timestamp).toLocaleString('en-US', {
+              month: 'short',
+              day: 'numeric',
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true
+            })}
+          </span>
+        </div>
         {isEditing ? (
              <InlineEditForm 
                 initialContent={message.content}
