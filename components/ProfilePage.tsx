@@ -470,6 +470,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
                   )}
                 </div>
               </details>
+            </div>
         </div>
 
         {/* Sticky Bottom Buttons */}
