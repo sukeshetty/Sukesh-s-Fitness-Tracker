@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FITT - What If I Eat...</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+        darkMode: "class",
+        theme: {
+            extend: {
+                colors: {
+                    "primary": {
+                        DEFAULT: "#9333ea", // purple-600
+                        light: "#a855f7", // purple-500
+                        dark: "#7e22ce" // purple-700
+                    },
+                    "background-light": "#f6f8f7",
+                    "background-dark": "#1f1a2e",
+                },
+                fontFamily: {
+                    "display": ["Inter", "sans-serif"]
+                },
+                borderRadius: {
+                    "DEFAULT": "0.5rem",
+                    "lg": "1rem",
+                    "xl": "1.5rem",
+                    "full": "9999px"
+                },
+            },
+        },
+    }
+    </script>
+<style>
+    .glass-card {
+        background-color: rgba(147, 51, 234, 0.1);backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid rgba(147, 51, 234, 0.2);
+    }
+    .primary-gradient {
+        background: linear-gradient(to right, #a855f7, #9333ea);
+    }
+    </style>
+<style>
+    body {
+        min-height: max(884px, 100dvh);
+    }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark font-display">
+<div class="relative min-h-screen w-full overflow-y-auto">
+<div class="absolute inset-0 z-0 h-full w-full bg-background-dark"></div>
+<div class="absolute left-1/2 top-0 z-0 h-96 w-96 -translate-x-1/2 -translate-y-1/2 transform rounded-full bg-purple-900/50 blur-3xl"></div>
+<div class="absolute bottom-0 right-0 z-0 h-96 w-96 translate-x-1/2 translate-y-1/2 transform rounded-full bg-fuchsia-900/40 blur-3xl"></div>
+<div class="relative z-10 flex min-h-screen flex-col p-4 sm:p-6">
+<div class="flex items-center justify-between pb-4">
+<h1 class="flex-1 text-xl font-bold leading-tight tracking-tight text-white">What If I Eat...</h1>
+<div class="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white">
+<span class="material-symbols-outlined">close</span>
+</div>
+</div>
+<div class="flex max-w-full flex-wrap items-end gap-4 py-3">
+<label class="flex flex-col min-w-40 flex-1">
+<div class="flex w-full flex-1 items-stretch rounded-xl glass-card">
+<input class="form-input flex h-14 min-w-0 flex-1 resize-none overflow-hidden rounded-xl border-none bg-transparent p-4 text-base font-normal leading-normal text-white placeholder:text-gray-300 focus:outline-0 focus:ring-0 focus:ring-primary/50" placeholder="e.g., a donut" value=""/>
+<div class="flex items-center justify-center pr-4 text-gray-300">
+<span class="material-symbols-outlined">search</span>
+</div>
+</div>
+</label>
+</div>
+<div class="flex flex-col gap-2 py-4">
+<p class="px-1 text-base font-normal leading-normal text-gray-200">To give you the best analysis, please clarify which kind of donut?</p>
+<div class="flex flex-wrap gap-2 pt-2">
+<div class="flex h-10 cursor-pointer shrink-0 items-center justify-center gap-x-2 rounded-xl bg-primary/20 px-4 transition-colors hover:bg-primary/40">
+<p class="text-sm font-medium leading-normal text-purple-200">Glazed</p>
+</div>
+<div class="flex h-10 cursor-pointer shrink-0 items-center justify-center gap-x-2 rounded-xl bg-primary/20 px-4 transition-colors hover:bg-primary/40">
+<p class="text-sm font-medium leading-normal text-purple-200">Jelly-filled</p>
+</div>
+<div class="flex h-10 cursor-pointer shrink-0 items-center justify-center gap-x-2 rounded-xl bg-primary/20 px-4 transition-colors hover:bg-primary/40">
+<p class="text-sm font-medium leading-normal text-purple-200">Chocolate Frosted</p>
+</div>
+</div>
+</div>
+<div class="mt-4 flex flex-col gap-6 rounded-xl glass-card p-4 sm:p-6 @container">
+<div class="flex flex-col gap-4">
+<div class="flex w-full min-w-72 grow flex-col items-stretch justify-center gap-1">
+<p class="text-lg font-bold leading-tight tracking-tight text-white">Impact on Your Day</p>
+<p class="text-base font-normal leading-normal text-gray-300">Here's how a slice of pepperoni pizza would affect your daily goals.</p>
+</div>
+<div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+<div class="flex flex-col items-center gap-2">
+<div class="relative flex h-24 w-24 items-center justify-center">
+<svg class="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
+<circle class="stroke-current text-white/10" cx="50" cy="50" fill="transparent" r="42" stroke-width="8"></circle>
+<circle class="stroke-current text-orange-400 transition-all duration-500" cx="50" cy="50" fill="transparent" r="42" stroke-dasharray="264" stroke-dashoffset="180" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="text-lg font-bold text-white">285</span>
+<span class="text-xs text-gray-400">kcal</span>
+</div>
+</div>
+<p class="text-sm font-medium text-white">Calories</p>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="relative flex h-24 w-24 items-center justify-center">
+<svg class="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
+<circle class="stroke-current text-white/10" cx="50" cy="50" fill="transparent" r="42" stroke-width="8"></circle>
+<circle class="stroke-current text-primary" cx="50" cy="50" fill="transparent" r="42" stroke-dasharray="264" stroke-dashoffset="200" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="text-lg font-bold text-white">12g</span>
+<span class="text-xs text-gray-400">of 120g</span>
+</div>
+</div>
+<p class="text-sm font-medium text-white">Protein</p>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="relative flex h-24 w-24 items-center justify-center">
+<svg class="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
+<circle class="stroke-current text-white/10" cx="50" cy="50" fill="transparent" r="42" stroke-width="8"></circle>
+<circle class="stroke-current text-blue-400" cx="50" cy="50" fill="transparent" r="42" stroke-dasharray="264" stroke-dashoffset="195" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="text-lg font-bold text-white">28g</span>
+<span class="text-xs text-gray-400">of 150g</span>
+</div>
+</div>
+<p class="text-sm font-medium text-white">Carbs</p>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="relative flex h-24 w-24 items-center justify-center">
+<svg class="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
+<circle class="stroke-current text-white/10" cx="50" cy="50" fill="transparent" r="42" stroke-width="8"></circle>
+<circle class="stroke-current text-fuchsia-400" cx="50" cy="50" fill="transparent" r="42" stroke-dasharray="264" stroke-dashoffset="150" stroke-linecap="round" stroke-width="8"></circle>
+</svg>
+<div class="absolute flex flex-col items-center">
+<span class="text-lg font-bold text-white">14g</span>
+<span class="text-xs text-gray-400">of 60g</span>
+</div>
+</div>
+<p class="text-sm font-medium text-white">Fat</p>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<h3 class="text-lg font-bold leading-tight tracking-tight text-white">Burn It Off</h3>
+<div class="grid grid-cols-1 gap-4 @[28rem]:grid-cols-2">
+<div class="flex items-center gap-4 rounded-lg bg-white/5 p-4">
+<div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-primary-light">
+<span class="material-symbols-outlined text-2xl">directions_run</span>
+</div>
+<div class="flex flex-col">
+<p class="font-semibold text-white">30 min Jogging</p>
+<p class="text-sm text-gray-300">Moderate Pace</p>
+</div>
+</div>
+<div class="flex items-center gap-4 rounded-lg bg-white/5 p-4">
+<div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20 text-primary-light">
+<span class="material-symbols-outlined text-2xl">directions_walk</span>
+</div>
+<div class="flex flex-col">
+<p class="font-semibold text-white">45 min Brisk Walk</p>
+<p class="text-sm text-gray-300">Uphill Sections</p>
+</div>
+</div>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<h3 class="text-lg font-bold leading-tight tracking-tight text-white">Swap It for a Healthier Choice</h3>
+<div class="grid grid-cols-1 gap-4 @[28rem]:grid-cols-2">
+<div class="flex flex-col overflow-hidden rounded-xl bg-white/5">
+<img class="h-32 w-full object-cover" data-alt="A delicious looking slice of veggie pizza on a wooden board" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAIeD5rfzA5yKPfefGqRE5uWyw3avf7GzxtOnG7ewfjdEmmbCBz6Le-KTuKWuvydshTwP6xEW4pLPUHcT9N7U_1tfKRmEZJlolY4P-3Z8D0CecWAkmORZpgeWOTePOLVkHV3bU6kcAGwemaVZYtC_FzRnOmiGo8sD7hBywf0cX3EBjPv2BwmnXjVCaKPRH-20GoYr2zWbiDlbf2YQ_mX8c4G9RIq2vMl7d79V0PkBAbEDWpx_qWhG6LV_YPPVFkEXT5hZw1klu9kqZb"/>
+<div class="flex flex-col p-4">
+<p class="font-semibold text-white">Slice of Veggie Pizza</p>
+<div class="mt-2 flex flex-wrap gap-2 text-xs">
+<span class="rounded-full bg-green-500/20 px-2 py-1 font-medium text-green-300">-80 Cal</span>
+<span class="rounded-full bg-purple-500/20 px-2 py-1 font-medium text-purple-300">+5g Protein</span>
+</div>
+</div>
+</div>
+<div class="flex flex-col overflow-hidden rounded-xl bg-white/5">
+<img class="h-32 w-full object-cover" data-alt="A whole wheat turkey wrap cut in half and stacked" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBKhV5h0mEphcv4rhcHuIENfD9ZJX7VBYxfC0KhtCDk3B_tA2dWu4OWM6pkIxjvnPEZr59X3YFsXk-gKVP2RcCus_IMwY3HpDf4IPhk0XlJIBuPzUJAFGY1hpAizSdLMns288_Q5X4Ed638LDSSJvmZDyRC0bOj5SFhlsyEIc7J0xBoZSLE-f7MRrVQa0pHMWkJbuwDPtIEhjeK8hHFRmBsP8KHp728l_pvM579F7zzdR2nnwyBcDn7tydNa0Ec-mgGyNH4TmHgmJ5S"/>
+<div class="flex flex-col p-4">
+<p class="font-semibold text-white">Whole Wheat Turkey Wrap</p>
+<div class="mt-2 flex flex-wrap gap-2 text-xs">
+<span class="rounded-full bg-green-500/20 px-2 py-1 font-medium text-green-300">-120 Cal</span>
+<span class="rounded-full bg-purple-500/20 px-2 py-1 font-medium text-purple-300">+10g Protein</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="pt-4">
+<button class="primary-gradient h-14 w-full rounded-xl text-center text-base font-bold text-white transition-transform hover:scale-[1.02]">Log This Food</button>
+</div>
+</div>
+<div class="h-10"></div>
+</div>
+</div>
+
+</body></html>
