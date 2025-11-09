@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>FITT AI Chat</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#E100FF",
+            "primary-accent": "#7F00FF",
+            "background-light": "#f6f8f7",
+            "background-dark": "#0A0A0A",
+          },
+          fontFamily: {
+            "display": ["Inter", "sans-serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+<style>
+    body {
+      overflow-x: hidden;
+    }
+    .glassmorphism {
+      background-color: rgba(255, 255, 255, 0.07);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .chat-bubble {
+        position: relative;
+        padding: 1rem 1.25rem;
+        border-radius: 1.25rem;
+        max-width: 80%;
+    }
+    .chat-bubble.user {
+        background: linear-gradient(135deg, #7F00FF, #E100FF);
+        color: white;
+        border-bottom-right-radius: 0.25rem;
+        align-self: flex-end;
+    }
+    .chat-bubble.ai {
+        background-color: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #E0E0E0;
+        border-bottom-left-radius: 0.25rem;
+        align-self: flex-start;
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+    textarea {
+        transition: height 0.2s ease-in-out;
+    }
+  </style>
+  </head>
+<body class="bg-background-dark font-display">
+<div class="relative flex h-screen w-full flex-col overflow-hidden">
+<!-- Purple gradient background blur effects -->
+<div class="absolute -top-20 -left-20 h-80 w-80 rounded-full bg-primary-accent/30 opacity-60 blur-3xl filter"></div>
+<div class="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-primary/20 opacity-50 blur-3xl filter"></div>
+<div class="absolute top-1/3 left-1/4 h-72 w-72 rounded-full bg-primary/10 opacity-40 blur-3xl filter"></div>
+
+<div class="relative z-10 flex h-full flex-col">
+<!-- Header -->
+<header class="flex items-center justify-between p-4 bg-background-dark/80 backdrop-blur-sm">
+<button class="flex h-10 w-10 items-center justify-center rounded-full text-white/80 transition-colors hover:bg-white/10 hover:text-white">
+<span class="material-symbols-outlined text-2xl">arrow_back_ios_new</span>
+</button>
+<div class="text-center">
+<h1 class="text-lg font-bold text-white">AI Coach</h1>
+<p class="text-sm text-primary">Processing...</p>
+</div>
+<div class="h-10 w-10"></div>
+</header>
+
+<!-- Main Chat Area -->
+<main class="flex-1 space-y-6 overflow-y-auto p-4 pb-6">
+<div class="flex w-full flex-col gap-4">
+<!-- User Message -->
+<div class="chat-bubble user">
+<p>I had a chicken salad for lunch</p>
+</div>
+
+<!-- AI Response - Total Nutrition Summary -->
+<div class="chat-bubble ai flex flex-col gap-4">
+<div class="space-y-3 rounded-xl bg-white/5 p-4">
+<div class="flex items-start justify-between">
+<h3 class="text-md font-bold text-white">Total Nutrition Summary</h3>
+<p class="text-xs text-white/50">Oct 26, 1:15 PM</p>
+</div>
+<div class="grid grid-cols-2 gap-x-4 gap-y-2">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-lg text-red-400">local_fire_department</span>
+<p class="text-sm text-white/90">350 <span class="text-xs text-white/60">kcal</span></p>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-lg text-green-400">egg</span>
+<p class="text-sm text-white/90">30g <span class="text-xs text-white/60">Protein</span></p>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-lg text-blue-400">water_drop</span>
+<p class="text-sm text-white/90">15g <span class="text-xs text-white/60">Fat</span></p>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-lg text-yellow-400">breakfast_dining</span>
+<p class="text-sm text-white/90">25g <span class="text-xs text-white/60">Carbs</span></p>
+</div>
+</div>
+</div>
+
+<!-- Individual Ingredients -->
+<div class="space-y-2">
+<h3 class="text-md font-bold text-white">Individual Ingredients</h3>
+<div class="flex flex-col gap-2">
+<div class="flex items-center justify-between rounded-lg bg-white/5 p-3">
+<p class="text-sm text-white/90">Grilled Chicken Breast (150g)</p>
+<p class="text-sm font-semibold text-white">165 kcal</p>
+</div>
+<div class="flex items-center justify-between rounded-lg bg-white/5 p-3">
+<p class="text-sm text-white/90">Mixed Greens (2 cups)</p>
+<p class="text-sm font-semibold text-white">10 kcal</p>
+</div>
+<div class="flex items-center justify-between rounded-lg bg-white/5 p-3">
+<p class="text-sm text-white/90">Cherry Tomatoes (1/2 cup)</p>
+<p class="text-sm font-semibold text-white">15 kcal</p>
+</div>
+<div class="flex items-center justify-between rounded-lg bg-white/5 p-3">
+<p class="text-sm text-white/90">Vinaigrette Dressing (2 tbsp)</p>
+<p class="text-sm font-semibold text-white">160 kcal</p>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Daily Totals Summary -->
+<div class="chat-bubble ai glassmorphism flex flex-col gap-4 p-4">
+<h3 class="text-md font-bold text-white">Daily Totals Summary</h3>
+<div class="flex items-center justify-between gap-4">
+<div class="flex-1 space-y-3">
+<div class="space-y-1">
+<div class="flex justify-between text-sm">
+<span class="text-white/70">Calories</span>
+<span class="font-semibold text-white">1250 / 2000</span>
+</div>
+<div class="h-2 w-full rounded-full bg-white/10">
+<div class="h-2 w-[62.5%] rounded-full bg-gradient-to-r from-red-500 to-orange-500"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-sm">
+<span class="text-white/70">Protein</span>
+<span class="font-semibold text-white">90g / 150g</span>
+</div>
+<div class="h-2 w-full rounded-full bg-white/10">
+<div class="h-2 w-[60%] rounded-full bg-gradient-to-r from-green-500 to-teal-400"></div>
+</div>
+</div>
+<div class="space-y-1">
+<div class="flex justify-between text-sm">
+<span class="text-white/70">Fat</span>
+<span class="font-semibold text-white">50g / 70g</span>
+</div>
+<div class="h-2 w-full rounded-full bg-white/10">
+<div class="h-2 w-[71.4%] rounded-full bg-gradient-to-r from-blue-500 to-cyan-400"></div>
+</div>
+</div>
+</div>
+<div class="relative flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-full bg-primary-accent/10">
+<svg class="h-full w-full -rotate-90 transform" viewBox="0 0 36 36">
+<circle class="text-white/10" cx="18" cy="18" fill="none" r="16" stroke="currentColor" stroke-width="3"></circle>
+<circle class="text-primary-accent drop-shadow-[0_0_5px_rgba(127,0,255,0.8)]" cx="18" cy="18" fill="none" r="16" stroke="currentColor" stroke-dasharray="100, 100" stroke-dashoffset="35" stroke-linecap="round" stroke-width="3"></circle>
+</svg>
+<div class="absolute flex flex-col items-center justify-center">
+<span class="text-2xl font-black text-white">65%</span>
+<span class="text-xs font-semibold uppercase tracking-wider text-white/60">Goal</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+<!-- Footer Input -->
+<footer class="sticky bottom-0 z-20 mt-auto w-full p-4 pt-2">
+<div class="glassmorphism w-full rounded-2xl p-2 transition-all duration-300">
+<div class="flex items-center space-x-2 border-b border-white/10 px-2 pb-2">
+<button class="flex h-9 w-9 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white">
+<span class="material-symbols-outlined text-2xl">photo_camera</span>
+</button>
+<button class="flex h-9 w-9 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white">
+<span class="material-symbols-outlined text-2xl">calendar_month</span>
+</button>
+<button class="flex h-9 w-9 items-center justify-center rounded-lg text-white/60 transition-colors hover:bg-white/10 hover:text-white">
+<span class="material-symbols-outlined text-2xl">mic</span>
+</button>
+</div>
+<div class="flex items-end space-x-2 pt-2">
+<textarea class="min-h-[44px] max-h-32 flex-1 resize-none self-center border-none bg-transparent p-2 text-white placeholder-white/50 focus:ring-0" placeholder="What did you eat?" rows="1">My lunch was a big salad with grilled chicken, cherry tomatoes, cucumbers, a handful of walnuts, and a light vinaigrette dressing. I also had a small apple on the side.</textarea>
+<button class="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary-accent to-primary text-white transition-transform hover:scale-105 active:scale-95">
+<span class="material-symbols-outlined text-2xl">send</span>
+</button>
+</div>
+</div>
+</footer>
+</div>
+</div>
+</body></html>

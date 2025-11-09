@@ -99,105 +99,92 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isSending, isSubmi
     : 'bg-white/5 hover:bg-white/10 text-[var(--text-primary)]';
   
   return (
-    <div className="space-y-3">
-      {/* Icons Row - Above the input */}
-      <div className="flex items-center justify-between px-2">
-        <div className="flex items-center gap-2">
-          {/* Attachment Icon */}
-          <input type="file" accept="image/*" ref={analysisFileRef} onChange={handleFileChange} className="hidden" />
-          <button
-            type="button"
-            onClick={() => { analysisFileRef.current?.click(); triggerHapticFeedback(15); }}
-            className="text-[var(--icon-color)] hover:text-[var(--text-primary)] p-2 rounded-full hover:bg-white/10 transition-colors"
-            aria-label="Upload photo for analysis"
-            title="Upload food photo"
-          >
-            <PaperclipIcon className="w-5 h-5" />
-          </button>
-
-          {/* Date Picker Icon */}
-          <div className="relative">
-            {isDatePickerOpen && (
-              <div ref={datePickerRef} className="absolute bottom-full mb-2 w-64 bg-[var(--component-bg)] backdrop-blur-xl rounded-xl ring-1 ring-[var(--glass-border)] shadow-lg p-3 animate-slideUp z-10">
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <button type="button" onClick={() => handleDateSelect(new Date().toISOString().split('T')[0])} className={`text-sm w-full text-center py-2 rounded-lg transition-colors ${quickDateButtonClasses}`}>Today</button>
-                  <button type="button" onClick={() => handleDateSelect(getYesterdayISO())} className={`text-sm w-full text-center py-2 rounded-lg transition-colors ${quickDateButtonClasses}`}>Yesterday</button>
-                </div>
-                <label className="block text-xs text-[var(--text-secondary)] mb-1 px-1">Select another date</label>
-                <input
-                  type="date"
-                  value={logDate}
-                  onChange={(e) => handleDateSelect(e.target.value)}
-                  max={new Date().toISOString().split('T')[0]}
-                  className={`w-full rounded-lg p-2 text-sm border ${dateInputClasses}`}
-                  aria-label="Select log date"
-                />
-              </div>
-            )}
+    <div className="w-full">
+      <div className="bg-white/5 backdrop-blur-2xl rounded-2xl p-2 border border-white/10 transition-all duration-300">
+        {/* Icons Row - Top border */}
+        <div className="flex items-center justify-between px-2 pb-2 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            {/* Camera/Attachment Icon */}
+            <input type="file" accept="image/*" ref={analysisFileRef} onChange={handleFileChange} className="hidden" />
             <button
               type="button"
-              onClick={() => { setIsDatePickerOpen(prev => !prev); triggerHapticFeedback(15); }}
-              className="date-picker-toggle text-[var(--icon-color)] hover:text-[var(--text-primary)] p-2 rounded-full hover:bg-white/10 transition-colors flex items-center gap-1.5"
-              aria-label="Select log date"
-              title={`Logging for ${getRelativeDateString(logDate)}`}
+              onClick={() => { analysisFileRef.current?.click(); triggerHapticFeedback(15); }}
+              className="text-white/60 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors"
+              aria-label="Upload photo for analysis"
+              title="Upload food photo"
             >
-              <CalendarIcon className="w-5 h-5" />
+              <PaperclipIcon className="w-5 h-5" />
             </button>
-          </div>
-        </div>
 
-        {/* Date Display */}
-        <span className="text-xs text-[var(--text-secondary)]">
-          {getRelativeDateString(logDate)}
-        </span>
-      </div>
-
-      {/* Input Form */}
-      <form
-        onSubmit={handleSubmit}
-        className={`
-          bg-[var(--glass-bg)] backdrop-blur-xl
-          rounded-3xl border border-[var(--glass-border)]
-          transition-all duration-300 ease-in-out
-          ${isFocused ? 'ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/20' : ''}
-          flex items-end gap-x-2 p-1.5
-        `}
-      >
-        {/* Auto-growing Textarea */}
-        <div className="grid flex-1 min-w-0" style={{'gridTemplateColumns': '100%'}}>
-            {/* Invisible div for sizing */}
-            <div
-                className={`invisible whitespace-pre-wrap break-words [grid-area:1/1] p-2.5 ${isFocused ? 'min-h-[80px]' : 'min-h-0'}`}
-                aria-hidden="true"
-            >
-                {input}{' '}
+            {/* Date Picker Icon */}
+            <div className="relative">
+              {isDatePickerOpen && (
+                <div ref={datePickerRef} className="absolute bottom-full mb-2 w-64 bg-zinc-900/95 backdrop-blur-xl rounded-xl ring-1 ring-white/20 shadow-lg p-3 animate-slideUp z-10">
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <button type="button" onClick={() => handleDateSelect(new Date().toISOString().split('T')[0])} className="text-sm w-full text-center py-2 rounded-lg transition-colors bg-white/5 hover:bg-white/10 text-white">Today</button>
+                    <button type="button" onClick={() => handleDateSelect(getYesterdayISO())} className="text-sm w-full text-center py-2 rounded-lg transition-colors bg-white/5 hover:bg-white/10 text-white">Yesterday</button>
+                  </div>
+                  <label className="block text-xs text-white/60 mb-1 px-1">Select another date</label>
+                  <input
+                    type="date"
+                    value={logDate}
+                    onChange={(e) => handleDateSelect(e.target.value)}
+                    max={new Date().toISOString().split('T')[0]}
+                    className="w-full rounded-lg p-2 text-sm border bg-zinc-800/80 border-zinc-600 text-white"
+                    aria-label="Select log date"
+                  />
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => { setIsDatePickerOpen(prev => !prev); triggerHapticFeedback(15); }}
+                className="date-picker-toggle text-white/60 hover:text-white p-2 rounded-lg hover:bg-white/10 transition-colors flex items-center gap-1.5"
+                aria-label="Select log date"
+                title={`Logging for ${getRelativeDateString(logDate)}`}
+              >
+                <CalendarIcon className="w-5 h-5" />
+              </button>
             </div>
-            <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                placeholder="What did you eat? (e.g., 2 eggs, whole wheat toast, coffee...)"
-                rows={1}
-                className={`[grid-area:1/1] w-full bg-transparent border-none focus:ring-0 resize-none placeholder-[var(--text-secondary)] text-[var(--text-primary)] p-2.5 overflow-y-auto transition-all duration-300 ${isFocused ? 'min-h-[80px] max-h-[320px]' : 'max-h-48'}`}
-                disabled={isSubmitting}
-            />
+          </div>
+
+          {/* Date Display */}
+          <span className="text-xs text-white/50">
+            {getRelativeDateString(logDate)}
+          </span>
         </div>
-        
-        {/* Send Button */}
-        <div className={`flex-shrink-0 transition-all duration-200 ease-in-out ${hasContent ? 'scale-100 opacity-100' : 'scale-75 opacity-0 pointer-events-none'}`}>
+
+        {/* Input Form */}
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-end gap-x-2 pt-2"
+        >
+          {/* Textarea */}
+          <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder="What did you eat?"
+              rows={1}
+              className="flex-1 min-h-[44px] max-h-32 resize-none bg-transparent border-none focus:ring-0 text-white placeholder-white/50 p-2"
+              disabled={isSubmitting}
+          />
+
+          {/* Send Button */}
           <button
             type="submit"
             disabled={isSubmitting || !hasContent}
-            className="bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:cursor-not-allowed text-white font-bold w-9 h-9 rounded-full flex items-center justify-center transition-all duration-200"
+            className={`flex-shrink-0 flex h-11 w-11 items-center justify-center rounded-full bg-gradient-to-br from-[#7F00FF] to-[#E100FF] text-white transition-all duration-200 ${
+              hasContent ? 'hover:scale-105 active:scale-95' : 'opacity-50 cursor-not-allowed'
+            }`}
             aria-label="Send message"
           >
             {isSending ? <Spinner /> : <SendIcon className="w-5 h-5" />}
           </button>
-        </div>
-      </form>
-       <p className="text-center text-xs text-[var(--text-secondary)] mt-2 px-4">
+        </form>
+      </div>
+      <p className="text-center text-xs text-white/40 mt-2 px-4">
         SukeshFIT can make mistakes. Consider checking important information.
       </p>
     </div>

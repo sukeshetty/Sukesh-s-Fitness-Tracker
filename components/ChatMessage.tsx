@@ -129,92 +129,103 @@ const ChatMessageBubble: React.FC<ChatMessageProps> = ({ message, isMealLog, isE
   }, [message.imageUrl]);
 
   return (
-    <div className={`group flex items-start gap-4 my-6 w-full ${isUser ? 'max-w-2xl flex-row-reverse' : 'max-w-4xl'}`}>
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center self-start">
-        {isUser ? <UserIcon className="w-5 h-5 text-zinc-400" /> : <GeminiStarIcon className="w-6 h-6" />}
-      </div>
-      
-      <div className={`flex-1 flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-1 min-w-0`}>
-        <div className={`w-full flex items-center gap-2 ${isUser ? 'justify-end' : 'justify-start'}`}>
-          <p className={`font-semibold text-[var(--text-primary)] text-md`}>{isUser ? 'You' : 'SukeshFIT'}</p>
-          <span className="text-xs text-[var(--text-secondary)]">
-            {new Date(message.timestamp).toLocaleString('en-US', {
-              month: 'short',
-              day: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true
-            })}
-          </span>
-        </div>
-        {isEditing ? (
-             <InlineEditForm 
-                initialContent={message.content}
-                onSave={(newContent) => onEditMessage(message.id, newContent)}
-                onCancel={onCancelEdit}
-                isProcessing={isCurrentlySavingEdit}
-             />
-        ) : (
-            <>
-                {message.imageUrl && (
-                    <div className="mt-2 mb-2 w-full max-w-xs rounded-lg overflow-hidden ring-1 ring-[var(--glass-border)]">
-                        <img src={message.imageUrl} alt="User upload" className="w-full h-auto object-cover"/>
-                    </div>
-                )}
-                {!isUser && message.nutritionData && message.nutritionData.length > 0 && (
-                    <div className="w-full my-2">
-                        <TotalNutritionCard data={message.nutritionData} timestamp={message.timestamp} />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            {message.nutritionData.map((item, index) => (
-                            <NutritionCard key={index} data={item} />
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {!isUser && message.activityData && message.activityData.length > 0 && (
-                    <div className="w-full my-2">
-                        <TotalActivityCard data={message.activityData} timestamp={message.timestamp} />
-                    </div>
-                )}
-                
-                {message.content ? (
-                    <div className="flex items-center gap-2 w-full">
-                        <div
-                            className={`prose prose-invert prose-p:my-2 prose-headings:my-3 max-w-none text-[var(--text-primary)] prose-p:text-[var(--text-primary)] prose-strong:text-[var(--text-primary)] ${isUser ? '[&_p]:text-right w-full' : 'prose-p:text-left'}`}
-                            dangerouslySetInnerHTML={{ __html: sanitizedMarkup }}
-                        />
-                        {!isUser && <TTSButton textToSpeak={message.content} />}
-                    </div>
-                ) : null}
-
-                {isAnalyzedLogMessage && (
-                    <div className="w-full mt-4">
-                        <DailySummaryCard 
-                          messages={messagesForSummary.filter(m => new Date(m.timestamp) <= new Date(message.timestamp))}
-                          dailyTargets={dailyTargets}
-                        />
-                    </div>
-                )}
-
-                {isLoading && <LoadingIndicator />}
-            </>
+    <div className={`flex w-full my-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
+      <div className={`group flex items-start gap-3 ${isUser ? 'max-w-[80%] flex-row-reverse' : 'max-w-[85%]'}`}>
+        {/* Avatar - only for AI messages in new design */}
+        {!isUser && (
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center self-start mt-1">
+            <GeminiStarIcon className="w-5 h-5" />
+          </div>
         )}
-      </div>
 
-       {isUser && isMealLog && !isEditing && (
-            <div className="flex self-center mr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 gap-1">
-                 <button
-                    onClick={() => onStartEdit(message.id)}
-                    className="text-zinc-400 hover:text-zinc-100 p-2 rounded-full hover:bg-zinc-700/50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Edit meal"
-                    aria-label="Edit meal"
-                    disabled={isProcessing}
-                    >
-                    <EditIcon className="w-4 h-4" />
-                </button>
-            </div>
+        <div className={`flex-1 flex flex-col ${isUser ? 'items-end' : 'items-start'} gap-2 min-w-0`}>
+          {isEditing ? (
+               <InlineEditForm
+                  initialContent={message.content}
+                  onSave={(newContent) => onEditMessage(message.id, newContent)}
+                  onCancel={onCancelEdit}
+                  isProcessing={isCurrentlySavingEdit}
+               />
+          ) : (
+              <>
+                  {message.imageUrl && (
+                      <div className="w-full max-w-xs rounded-xl overflow-hidden ring-1 ring-white/20">
+                          <img src={message.imageUrl} alt="User upload" className="w-full h-auto object-cover"/>
+                      </div>
+                  )}
+
+                  {message.content && (
+                      <div
+                        className={`relative px-4 py-3 rounded-2xl ${
+                          isUser
+                            ? 'bg-gradient-to-br from-[#7F00FF] to-[#E100FF] text-white rounded-br-sm'
+                            : 'bg-white/10 backdrop-blur-md border border-white/10 text-gray-200 rounded-bl-sm'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2 w-full">
+                          <div
+                              className={`prose prose-invert prose-p:my-1 prose-headings:my-2 max-w-none prose-p:text-inherit prose-strong:text-inherit ${isUser ? '[&_p]:text-right w-full' : 'prose-p:text-left flex-1'}`}
+                              dangerouslySetInnerHTML={{ __html: sanitizedMarkup }}
+                          />
+                          {!isUser && <TTSButton textToSpeak={message.content} />}
+                        </div>
+                        <span className="text-[10px] opacity-60 mt-1 block">
+                          {new Date(message.timestamp).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </span>
+                      </div>
+                  )}
+
+                  {!isUser && message.nutritionData && message.nutritionData.length > 0 && (
+                      <div className="w-full space-y-3">
+                          <TotalNutritionCard data={message.nutritionData} timestamp={message.timestamp} />
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              {message.nutritionData.map((item, index) => (
+                              <NutritionCard key={index} data={item} />
+                              ))}
+                          </div>
+                      </div>
+                  )}
+
+                  {!isUser && message.activityData && message.activityData.length > 0 && (
+                      <div className="w-full">
+                          <TotalActivityCard data={message.activityData} timestamp={message.timestamp} />
+                      </div>
+                  )}
+
+                  {isAnalyzedLogMessage && (
+                      <div className="w-full">
+                          <DailySummaryCard
+                            messages={messagesForSummary.filter(m => new Date(m.timestamp) <= new Date(message.timestamp))}
+                            dailyTargets={dailyTargets}
+                          />
+                      </div>
+                  )}
+
+                  {isLoading && <LoadingIndicator />}
+              </>
           )}
+        </div>
+
+         {isUser && isMealLog && !isEditing && (
+              <div className="flex self-start mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                   <button
+                      onClick={() => onStartEdit(message.id)}
+                      className="text-white/60 hover:text-white p-2 rounded-full hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Edit meal"
+                      aria-label="Edit meal"
+                      disabled={isProcessing}
+                      >
+                      <EditIcon className="w-4 h-4" />
+                  </button>
+              </div>
+            )}
+      </div>
     </div>
   );
 };

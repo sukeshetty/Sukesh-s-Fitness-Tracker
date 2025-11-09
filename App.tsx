@@ -559,8 +559,17 @@ const App: React.FC = () => {
   }, [messages.length, editingMessageId]);
 
   return (
-    <div className="flex flex-col h-screen bg-transparent text-zinc-200 font-sans">
-      <header className="safe-top bg-[var(--glass-bg)] backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 z-20 border-b border-[var(--glass-border)]">
+    <div className="relative flex flex-col h-screen overflow-hidden text-zinc-200 font-sans">
+      {/* Purple gradient background blur effects - only show on chat view */}
+      {view === 'chat' && (
+        <>
+          <div className="absolute -top-20 -left-20 h-80 w-80 rounded-full bg-[#7F00FF]/30 opacity-60 blur-3xl filter animate-pulse"></div>
+          <div className="absolute -bottom-24 -right-24 h-96 w-96 rounded-full bg-[#E100FF]/20 opacity-50 blur-3xl filter animate-pulse" style={{ animationDelay: '2s' }}></div>
+          <div className="absolute top-1/3 left-1/4 h-72 w-72 rounded-full bg-[#E100FF]/10 opacity-40 blur-3xl filter animate-pulse" style={{ animationDelay: '1s' }}></div>
+        </>
+      )}
+
+      <header className="safe-top relative z-20 bg-[var(--glass-bg)] backdrop-blur-lg p-3 flex items-center justify-between gap-3 sticky top-0 border-b border-[var(--glass-border)]">
         <div className="flex items-center gap-2">
             <button onClick={() => { setView('home'); triggerHapticFeedback(); }} title="Home" className="p-2 text-[var(--icon-color)] hover:text-green-500 transition-colors"><HomeIcon className="w-6 h-6"/></button>
             <h1 className="text-xl font-medium text-[var(--text-primary)]">SukeshFIT</h1>
@@ -573,7 +582,7 @@ const App: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4 md:px-6 pt-16">
+      <main className="relative z-10 flex-1 overflow-y-auto px-4 md:px-6 pt-16">
         <div className="max-w-4xl mx-auto w-full h-full">
           {view === 'home' ? (
             <Greeting
@@ -590,7 +599,7 @@ const App: React.FC = () => {
             {groupedMessages.map(([date, messagesForDay]) => (
                 <div key={date} className="my-4">
                     <div className="flex justify-center my-4">
-                        <span className="bg-[var(--component-bg)] backdrop-blur-sm text-xs font-semibold px-3 py-1 rounded-full text-[var(--text-secondary)]">{getRelativeDate(date)}</span>
+                        <span className="bg-white/5 backdrop-blur-sm text-xs font-semibold px-3 py-1 rounded-full text-white/60">{getRelativeDate(date)}</span>
                     </div>
                     {messagesForDay.map((msg) => {
                         const globalIndex = messages.findIndex(m => m.id === msg.id);
@@ -618,8 +627,8 @@ const App: React.FC = () => {
           )}
         </div>
       </main>
-    
-      <footer className="safe-bottom w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[var(--bg-gradient-to)] via-[var(--bg-gradient-to)]/95 to-transparent pt-4">
+
+      <footer className="safe-bottom relative z-10 w-full px-4 pb-4 sticky bottom-0 bg-gradient-to-t from-[var(--bg-gradient-to)] via-[var(--bg-gradient-to)]/95 to-transparent pt-4">
         <div className="max-w-4xl mx-auto w-full">
             {error && <div className="bg-red-500/20 text-red-300 p-3 rounded-lg text-sm mb-2 text-center">{error}</div>}
             <ChatInput
