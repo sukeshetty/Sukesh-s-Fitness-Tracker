@@ -1,10 +1,8 @@
 import React, { useState } from 'react';
 import { GoogleGenAI, Type } from '@google/genai';
 import { DailySummaryEntry, UserProfile } from '../types';
-import { CloseIcon, LightbulbIcon, FireIcon, TargetIcon, RunIcon, SwapIcon, UserIcon } from './Icons';
+import { CloseIcon, UserIcon } from './Icons';
 import Spinner from './Spinner';
-import { useTheme } from './contexts/ThemeContext';
-import AnimatedNumber from './AnimatedNumber';
 import { triggerHapticFeedback } from '../utils/audio';
 
 interface WhatIfFoodProps {
@@ -17,10 +15,10 @@ interface WhatIfFoodProps {
 
 interface AnalysisResult {
     foodName: string;
-    estimatedNutrition: { calories: number; protein: number; fat: number; };
+    estimatedNutrition: { calories: number; protein: number; carbs: number; fat: number; };
     dailyImpact: { excessCalories: number; excessProtein: number; excessFat: number; };
     weeklyAdjustments: { activity: string; duration: string; emoji: string; }[];
-    swapSuggestions: { suggestion: string; caloriesSaved: number; emoji: string; }[];
+    swapSuggestions: { suggestion: string; caloriesSaved: number; proteinBoost: number; emoji: string; }[];
 }
 
 const responseSchema = {
@@ -42,9 +40,10 @@ const responseSchema = {
           properties: {
             calories: { type: Type.NUMBER },
             protein: { type: Type.NUMBER },
+            carbs: { type: Type.NUMBER },
             fat: { type: Type.NUMBER },
           },
-          required: ['calories', 'protein', 'fat']
+          required: ['calories', 'protein', 'carbs', 'fat']
         },
         dailyImpact: {
           type: Type.OBJECT,
@@ -74,9 +73,10 @@ const responseSchema = {
             properties: {
               suggestion: { type: Type.STRING },
               caloriesSaved: { type: Type.NUMBER },
+              proteinBoost: { type: Type.NUMBER },
               emoji: { type: Type.STRING },
             },
-            required: ['suggestion', 'caloriesSaved', 'emoji']
+            required: ['suggestion', 'caloriesSaved', 'proteinBoost', 'emoji']
           }
         }
       },
@@ -85,6 +85,37 @@ const responseSchema = {
   }
 };
 
+const CircularProgress: React.FC<{ value: number; max: number; color: string; label: string; unit?: string }> = ({ value, max, color, label, unit = '' }) => {
+  const percentage = Math.min((value / max) * 100, 100);
+  const circumference = 2 * Math.PI * 42;
+  const offset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative flex h-24 w-24 items-center justify-center">
+        <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 100 100">
+          <circle className="stroke-current text-white/10" cx="50" cy="50" fill="transparent" r="42" strokeWidth="8"></circle>
+          <circle
+            className={`stroke-current ${color} transition-all duration-500`}
+            cx="50"
+            cy="50"
+            fill="transparent"
+            r="42"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            strokeWidth="8"
+          ></circle>
+        </svg>
+        <div className="absolute flex flex-col items-center">
+          <span className="text-lg font-bold text-white">{value}{unit}</span>
+          {max > 0 && <span className="text-xs text-gray-400">of {max}{unit}</span>}
+        </div>
+      </div>
+      <p className="text-sm font-medium text-white">{label}</p>
+    </div>
+  );
+};
 
 const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, dailySummaries, onOpenProfile }) => {
   const [foodInput, setFoodInput] = useState('');
@@ -93,8 +124,6 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
   const [clarificationQuestion, setClarificationQuestion] = useState<string | null>(null);
   const [conversationHistory, setConversationHistory] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const { theme } = useTheme();
-  const isLight = theme === 'light';
 
   const handleAnalyzeImpact = async () => {
     if (!foodInput || !userProfile) return;
@@ -105,7 +134,7 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
     setError(null);
 
     const updatedHistory = [...conversationHistory, `User: ${foodInput}`];
-    
+
     const last7Days = dailySummaries.filter(s => {
         const date = new Date(s.date);
         const sevenDaysAgo = new Date();
@@ -132,14 +161,14 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
         **Instructions:**
         1.  **Vague Input:** If the latest user input is vague (e.g., "a sandwich"), ask a clarifying question in the \`clarificationNeeded\` field. \`analysis\` must be null.
         2.  **Specific Input:** If the input is clear, provide a full analysis in the \`analysis\` field. \`clarificationNeeded\` must be null.
-            - Estimate nutrition for the food.
+            - Estimate nutrition for the food (include carbs).
             - Calculate the daily impact (amount OVER target for each macro).
             - Suggest 2 exercise adjustments.
-            - Suggest 2 healthier food swaps.
+            - Suggest 2 healthier food swaps with calorie savings and protein boost.
         `;
 
-      const response = await ai.models.generateContent({ 
-        model: 'gemini-2.5-flash', 
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
         contents: [{ parts: [{ text: prompt }] }],
         config: {
             responseMimeType: "application/json",
@@ -148,7 +177,7 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
       });
 
       const responseText = response.text;
-      
+
       try {
         const data = JSON.parse(responseText);
 
@@ -157,13 +186,9 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
           setConversationHistory(prev => [...prev, `User: ${foodInput}`, `AI: ${data.clarificationNeeded}`]);
           setFoodInput('');
         } else if (data.analysis) {
-          if (data.analysis.foodName && data.analysis.estimatedNutrition && data.analysis.dailyImpact && data.analysis.weeklyAdjustments && data.analysis.swapSuggestions) {
-             setAnalysisResult(data.analysis);
-             setConversationHistory([]);
-             setFoodInput('');
-          } else {
-             throw new Error("Received analysis object is missing required fields.");
-          }
+          setAnalysisResult(data.analysis);
+          setConversationHistory([]);
+          setFoodInput('');
         } else {
             throw new Error("AI response did not provide clarification or analysis.");
         }
@@ -183,7 +208,7 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
       setLoading(false);
     }
   };
-  
+
   const handleReset = () => {
     triggerHapticFeedback();
     setFoodInput('');
@@ -193,33 +218,25 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
     setError(null);
   };
 
-  const handleGoToProfile = () => {
-    triggerHapticFeedback();
-    onClose();
-    onOpenProfile();
-  };
-
-  const inputClasses = isLight ? 'bg-rose-50 border-rose-200 text-rose-900' : 'bg-zinc-800/80 border-zinc-600 text-white';
-
   if (!isOpen) return null;
 
   if (!userProfile) {
     return (
-      <div className="fixed inset-0 bg-[var(--modal-overlay-bg)] backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-        <div className="bg-[var(--component-bg)] backdrop-blur-xl rounded-2xl ring-1 ring-[var(--glass-border)] w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-          <header className="flex items-center justify-between p-4 border-b border-[var(--glass-border)]">
-            <div className="flex items-center gap-3"><LightbulbIcon className="w-6 h-6 text-pink-400" /><h2 className="text-xl font-bold text-[var(--text-primary)]">"What If I Eat..." Planner</h2></div>
-            <button onClick={onClose} className="p-1 text-[var(--icon-color)] hover:text-[var(--text-primary)]"><CloseIcon className="w-6 h-6" /></button>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="bg-[#1f1a2e] rounded-2xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
+          <header className="flex items-center justify-between p-4 border-b border-white/10">
+            <h2 className="text-xl font-bold text-white">What If I Eat...</h2>
+            <button onClick={onClose} className="p-1 text-white/70 hover:text-white"><CloseIcon className="w-6 h-6" /></button>
           </header>
           <div className="flex-1 overflow-y-auto p-6 text-center">
             <UserIcon className="w-16 h-16 text-zinc-600 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Complete Your Profile</h3>
-            <p className="text-[var(--text-secondary)] mb-6">
+            <h3 className="text-lg font-bold text-white mb-2">Complete Your Profile</h3>
+            <p className="text-white/70 mb-6">
               The "What If" planner needs your profile data to give you an accurate analysis. Please complete your profile first.
             </p>
             <button
-              onClick={handleGoToProfile}
-              className="w-full py-3 bg-pink-600 hover:bg-pink-500 rounded-lg font-semibold text-white transition-colors"
+              onClick={() => { onClose(); onOpenProfile(); }}
+              className="w-full py-3 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:opacity-90 rounded-lg font-semibold text-white transition-all"
             >
               Go to Profile
             </button>
@@ -230,117 +247,160 @@ const WhatIfFood: React.FC<WhatIfFoodProps> = ({ isOpen, onClose, userProfile, d
   }
 
   return (
-    <div className="fixed inset-0 bg-[var(--modal-overlay-bg)] backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[var(--component-bg)] backdrop-blur-xl rounded-2xl ring-1 ring-[var(--glass-border)] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-        <header className="flex items-center justify-between p-4 border-b border-[var(--glass-border)]">
-          <div className="flex items-center gap-3"><LightbulbIcon className="w-6 h-6 text-pink-400" /><h2 className="text-xl font-bold text-[var(--text-primary)]">"What If I Eat..." Planner</h2></div>
-          <button onClick={onClose} className="p-1 text-[var(--icon-color)] hover:text-[var(--text-primary)]"><CloseIcon className="w-6 h-6" /></button>
-        </header>
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {error && (
-                <div className="p-3 rounded-lg text-sm text-center bg-red-500/20 text-red-300 mb-4 animate-slideUp">
-                    {error}
-                </div>
-            )}
-            {!analysisResult && (
-                <>
-                <p className="text-sm text-[var(--text-secondary)]">
-                    {clarificationQuestion 
-                    ? "Your request was a bit vague. To give you the best analysis, please provide a bit more detail." 
-                    : "Curious about a treat? Enter a food item to see how it might affect your weekly goals and get tips on how to stay on track."}
-                </p>
-                {clarificationQuestion && (
-                    <div className={`p-3 rounded-lg text-sm text-center ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-300'}`}>
-                        {clarificationQuestion}
-                    </div>
-                )}
-                <div className="flex items-center gap-2">
-                    <input
-                        type="text"
-                        value={foodInput}
-                        onChange={e => setFoodInput(e.target.value)}
-                        placeholder={clarificationQuestion ? "e.g., Two slices, deep dish" : "e.g., a large pepperoni pizza..."}
-                        className={`flex-1 w-full rounded-lg p-3 border ${inputClasses}`}
-                        disabled={loading}
-                        onKeyPress={e => e.key === 'Enter' && handleAnalyzeImpact()}
-                    />
-                    <button onClick={handleAnalyzeImpact} disabled={loading || !foodInput} className="p-3 bg-pink-600 hover:bg-pink-500 rounded-lg text-white disabled:bg-zinc-600">
-                        {loading ? <Spinner /> : clarificationQuestion ? 'Submit' : 'Analyze'}
-                    </button>
-                </div>
-                </>
-            )}
-            
-            {analysisResult && userProfile && (
-                <div className="space-y-4 animate-slideUp">
-                    {/* Nutrition Card */}
-                    <AnalysisCard icon={<FireIcon className="text-orange-400 w-6 h-6"/>} title={`Estimated Nutrition for: ${analysisResult.foodName}`}>
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                            <div><p className="text-xs text-[var(--text-secondary)]">CALORIES</p><p className="text-2xl font-bold text-[var(--text-primary)]"><AnimatedNumber value={analysisResult.estimatedNutrition.calories} /></p></div>
-                            <div><p className="text-xs text-[var(--text-secondary)]">PROTEIN</p><p className="text-2xl font-bold text-[var(--text-primary)]"><AnimatedNumber value={analysisResult.estimatedNutrition.protein} suffix="g"/></p></div>
-                            <div><p className="text-xs text-[var(--text-secondary)]">FAT</p><p className="text-2xl font-bold text-[var(--text-primary)]"><AnimatedNumber value={analysisResult.estimatedNutrition.fat} suffix="g"/></p></div>
-                        </div>
-                    </AnalysisCard>
-                    
-                    {/* Daily Impact Card */}
-                    <AnalysisCard icon={<TargetIcon className="text-red-400 w-6 h-6"/>} title="Forecasted Daily Impact">
-                         <div className="grid grid-cols-3 gap-2 text-center">
-                            <div><p className="text-xs text-[var(--text-secondary)]">CALORIES OVER</p><p className="text-2xl font-bold text-red-400">+{analysisResult.dailyImpact.excessCalories}</p></div>
-                            <div><p className="text-xs text-[var(--text-secondary)]">PROTEIN OVER</p><p className="text-2xl font-bold text-red-400">+{analysisResult.dailyImpact.excessProtein}g</p></div>
-                            <div><p className="text-xs text-[var(--text-secondary)]">FAT OVER</p><p className="text-2xl font-bold text-red-400">+{analysisResult.dailyImpact.excessFat}g</p></div>
-                        </div>
-                    </AnalysisCard>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6" onClick={onClose}>
+      {/* Background with gradient blur effects */}
+      <div className="absolute inset-0 bg-[#1f1a2e]">
+        <div className="absolute left-1/2 top-0 h-96 w-96 -translate-x-1/2 -translate-y-1/2 transform rounded-full bg-purple-900/50 blur-3xl"></div>
+        <div className="absolute bottom-0 right-0 h-96 w-96 translate-x-1/2 translate-y-1/2 transform rounded-full bg-fuchsia-900/40 blur-3xl"></div>
+      </div>
 
-                    {/* Adjustment Plan Card */}
-                    <AnalysisCard icon={<RunIcon className="text-green-400 w-6 h-6"/>} title="Adjustment Plan">
-                        <div className="space-y-2">
-                           {analysisResult.weeklyAdjustments.map((adj, i) => (
-                               <div key={i} className={`p-2 rounded-lg flex items-center gap-3 ${isLight ? 'bg-rose-100' : 'bg-white/5'}`}>
-                                   <span className="text-2xl">{adj.emoji}</span>
-                                   <div>
-                                       <p className="font-semibold text-[var(--text-primary)]">{adj.activity}</p>
-                                       <p className="text-sm text-[var(--text-secondary)]">{adj.duration}</p>
-                                   </div>
-                               </div>
-                           ))}
-                        </div>
-                    </AnalysisCard>
-
-                    {/* Swap Suggestions Card */}
-                    <AnalysisCard icon={<SwapIcon className="text-blue-400 w-6 h-6"/>} title="Smarter Swaps">
-                        <div className="space-y-2">
-                           {analysisResult.swapSuggestions.map((swap, i) => (
-                               <div key={i} className={`p-2 rounded-lg flex items-center justify-between ${isLight ? 'bg-rose-100' : 'bg-white/5'}`}>
-                                   <div className="flex items-center gap-3">
-                                        <span className="text-2xl">{swap.emoji}</span>
-                                        <p className="font-semibold text-[var(--text-primary)]">{swap.suggestion}</p>
-                                   </div>
-                                   <p className="text-sm font-bold text-green-400">~{swap.caloriesSaved} cal saved</p>
-                               </div>
-                           ))}
-                        </div>
-                    </AnalysisCard>
-                    <button onClick={handleReset} className="w-full py-2.5 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-semibold text-white transition-colors">Analyze Another Food</button>
-                </div>
-            )}
+      {/* Main modal content */}
+      <div className="relative z-10 w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between pb-4">
+          <h1 className="flex-1 text-xl font-bold text-white">What If I Eat...</h1>
+          <div onClick={onClose} className="flex h-10 w-10 shrink-0 cursor-pointer items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors">
+            <CloseIcon className="w-5 h-5" />
+          </div>
         </div>
+
+        {/* Input Section */}
+        <div className="flex max-w-full flex-wrap items-end gap-4 py-3">
+          <label className="flex flex-col min-w-40 flex-1">
+            <div className="flex w-full flex-1 items-stretch rounded-xl" style={{ background: 'rgba(147, 51, 234, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(147, 51, 234, 0.2)' }}>
+              <input
+                className="flex h-14 min-w-0 flex-1 resize-none overflow-hidden rounded-xl border-none bg-transparent p-4 text-base text-white placeholder:text-gray-300 focus:outline-0 focus:ring-2 focus:ring-purple-500/50"
+                placeholder="e.g., a donut"
+                value={foodInput}
+                onChange={e => setFoodInput(e.target.value)}
+                onKeyPress={e => e.key === 'Enter' && handleAnalyzeImpact()}
+                disabled={loading}
+              />
+              <button
+                onClick={handleAnalyzeImpact}
+                disabled={loading || !foodInput}
+                className="flex items-center justify-center pr-4 text-gray-300 hover:text-white disabled:opacity-50"
+              >
+                {loading ? <Spinner /> : <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>}
+              </button>
+            </div>
+          </label>
+        </div>
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-3 rounded-lg text-sm text-center bg-red-500/20 text-red-300 mb-4 animate-slideUp">
+            {error}
+          </div>
+        )}
+
+        {/* Clarification Section */}
+        {clarificationQuestion && !analysisResult && (
+          <div className="flex flex-col gap-2 py-4">
+            <p className="px-1 text-base text-gray-200">{clarificationQuestion}</p>
+            <div className="flex flex-wrap gap-2 pt-2">
+              {/* These would be dynamically generated suggestion chips */}
+              <div className="flex h-10 cursor-pointer shrink-0 items-center justify-center gap-x-2 rounded-xl bg-purple-500/20 px-4 hover:bg-purple-500/40 transition-colors">
+                <p className="text-sm font-medium text-purple-200">Provide more details</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Analysis Results */}
+        {analysisResult && userProfile && (
+          <div className="mt-4 flex flex-col gap-6 rounded-xl p-4 sm:p-6 overflow-y-auto max-h-[calc(90vh-200px)]" style={{ background: 'rgba(147, 51, 234, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(147, 51, 234, 0.2)' }}>
+            {/* Impact on Your Day */}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <p className="text-lg font-bold text-white">Impact on Your Day</p>
+                <p className="text-base text-gray-300">Here's how {analysisResult.foodName} would affect your daily goals.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <CircularProgress
+                  value={analysisResult.estimatedNutrition.calories}
+                  max={userProfile.dailyTargets.calories}
+                  color="text-orange-400"
+                  label="Calories"
+                />
+                <CircularProgress
+                  value={analysisResult.estimatedNutrition.protein}
+                  max={userProfile.dailyTargets.protein}
+                  color="text-purple-500"
+                  label="Protein"
+                  unit="g"
+                />
+                <CircularProgress
+                  value={analysisResult.estimatedNutrition.carbs || 0}
+                  max={150}
+                  color="text-blue-400"
+                  label="Carbs"
+                  unit="g"
+                />
+                <CircularProgress
+                  value={analysisResult.estimatedNutrition.fat}
+                  max={userProfile.dailyTargets.fat}
+                  color="text-fuchsia-400"
+                  label="Fat"
+                  unit="g"
+                />
+              </div>
+            </div>
+
+            {/* Burn It Off */}
+            <div className="flex flex-col gap-4">
+              <h3 className="text-lg font-bold text-white">Burn It Off</h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {analysisResult.weeklyAdjustments.map((adj, i) => (
+                  <div key={i} className="flex items-center gap-4 rounded-lg bg-white/5 p-4">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/20 text-purple-400">
+                      <span className="text-2xl">{adj.emoji}</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <p className="font-semibold text-white">{adj.activity}</p>
+                      <p className="text-sm text-gray-300">{adj.duration}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Swap It for a Healthier Choice */}
+            <div className="flex flex-col gap-4">
+              <h3 className="text-lg font-bold text-white">Swap It for a Healthier Choice</h3>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {analysisResult.swapSuggestions.map((swap, i) => (
+                  <div key={i} className="flex flex-col overflow-hidden rounded-xl bg-white/5">
+                    <div className="flex items-center gap-3 p-4">
+                      <span className="text-3xl">{swap.emoji}</span>
+                      <div className="flex-1">
+                        <p className="font-semibold text-white">{swap.suggestion}</p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                          <span className="rounded-full bg-green-500/20 px-2 py-1 font-medium text-green-300">-{swap.caloriesSaved} Cal</span>
+                          <span className="rounded-full bg-purple-500/20 px-2 py-1 font-medium text-purple-300">+{swap.proteinBoost}g Protein</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="pt-4 flex flex-col gap-3">
+              <button
+                onClick={handleReset}
+                className="h-14 w-full rounded-xl text-center text-base font-bold text-white transition-transform hover:scale-[1.02]"
+                style={{ backgroundImage: 'linear-gradient(to right, #a855f7, #9333ea)' }}
+              >
+                Analyze Another Food
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
-
-const AnalysisCard: React.FC<{icon: React.ReactNode, title: string, children: React.ReactNode}> = ({icon, title, children}) => {
-    const { theme } = useTheme();
-    const isLight = theme === 'light';
-    return (
-        <div className={`p-4 rounded-xl ${isLight ? 'bg-rose-50 ring-1 ring-rose-200' : 'bg-white/5'}`}>
-            <div className="flex items-center gap-3 mb-3">
-                {icon}
-                <h3 className="font-bold text-[var(--text-primary)] text-md">{title}</h3>
-            </div>
-            {children}
-        </div>
-    )
-}
 
 export default WhatIfFood;
