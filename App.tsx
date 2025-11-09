@@ -578,10 +578,12 @@ const App: React.FC = () => {
           {view === 'home' ? (
             <Greeting
               userProfile={userProfile}
+              dailySummaries={allDailySummaries}
               onOpenHeyCoach={() => setIsHeyCoachOpen(true)}
               onOpenDietAnalysis={() => setIsDietAnalysisOpen(true)}
               onOpenFastingTracker={() => setIsFastingTrackerOpen(true)}
               onOpenWhatIfFood={() => setIsWhatIfFoodOpen(true)}
+              onNavigate={setView}
             />
           ) : (
             <>
