@@ -308,154 +308,187 @@ const ProfilePage: React.FC<ProfilePageProps> = ({ onClose, userProfile, onSave,
     : 'bg-zinc-800/50 text-zinc-200';
 
   return (
-    <div className="fixed inset-0 bg-[var(--modal-overlay-bg)] backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-[var(--component-bg)] backdrop-blur-xl rounded-2xl ring-1 ring-[var(--glass-border)] w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <header className="flex items-center justify-between p-4 border-b border-[var(--glass-border)]">
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">Your Health Profile</h2>
-          <button onClick={onClose} className="p-1 text-[var(--icon-color)] hover:text-[var(--text-primary)]"><CloseIcon className="w-6 h-6" /></button>
-        </header>
-        <div className="overflow-y-auto p-6 space-y-6">
-            {/* AI Persona Section */}
-            <section>
-                <div className={`p-4 rounded-xl flex items-center gap-4 ${isLight ? 'bg-rose-50' : 'bg-zinc-900/50'}`}>
-                    <div className="w-20 h-20 rounded-full bg-zinc-700 flex-shrink-0 flex items-center justify-center overflow-hidden">
-                        {profile.aiAvatar ? (
-                            <img src={profile.aiAvatar} alt="AI Avatar" className="w-full h-full object-cover" />
-                        ) : (
-                            <UserIcon className="w-10 h-10 text-zinc-500" />
-                        )}
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-xl font-bold text-[var(--text-primary)]">
-                            {profile.name || 'Your Name'}
-                            {profile.aiNickname && <span className="text-lg font-medium text-purple-400 ml-2">- {profile.aiNickname}</span>}
-                        </h3>
-                        <p className="text-sm text-[var(--text-secondary)] italic mt-1">
-                            {profile.aiSummary || 'Generate a persona to get a summary of your journey!'}
-                        </p>
-                    </div>
-                    <button
-                        onClick={handleGeneratePersona}
-                        disabled={isGeneratingPersona}
-                        className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:opacity-90 rounded-lg text-sm font-medium text-white disabled:bg-zinc-600 disabled:from-zinc-600 disabled:to-zinc-700 flex items-center gap-2"
-                        title="Generates an avatar, nickname, and summary based on your profile and recent activity."
-                    >
-                        {isGeneratingPersona ? <Spinner /> : '✨'}
-                        <span className="hidden sm:inline">{isGeneratingPersona ? 'Generating...' : 'Generate AI Persona'}</span>
-                    </button>
-                </div>
-            </section>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      {/* Gradient Background */}
+      <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(135deg, #0f0c29, #302b63, #24243e)' }}>
+        <div className="absolute inset-0 bg-black/30"></div>
+      </div>
 
-            {/* Vitals */}
-            <section>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Your Vitals</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Name</label><input type="text" value={profile.name || ''} onChange={e => setProfile(p => ({ ...p, name: e.target.value }))} className={`w-full rounded-lg p-2 border ${inputClasses}`} placeholder="Your Name"/></div>
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Age</label><input type="number" value={profile.age} onChange={e => setProfile(p => ({ ...p, age: Number(e.target.value) }))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Weight (kg)</label><input type="number" value={profile.weight} onChange={e => setProfile(p => ({ ...p, weight: Number(e.target.value) }))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Height (cm)</label><input type="number" value={profile.height} onChange={e => setProfile(p => ({ ...p, height: Number(e.target.value) }))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Gender</label><select value={profile.gender} onChange={e => setProfile(p => ({ ...p, gender: e.target.value as any }))} className={`w-full rounded-lg p-2 border ${inputClasses}`}><option value="male">Male</option><option value="female">Female</option><option value="other">Other</option></select></div>
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Activity</label><select value={profile.activityLevel} onChange={e => setProfile(p => ({ ...p, activityLevel: e.target.value as any }))} className={`w-full rounded-lg p-2 border ${inputClasses}`}><option value="sedentary">Sedentary</option><option value="light">Light</option><option value="moderate">Moderate</option><option value="active">Active</option><option value="very_active">Very Active</option></select></div>
-                    <div className="col-span-2 md:col-span-1"><label className="block text-sm text-[var(--text-secondary)] mb-1">Goal</label><select value={profile.goal} onChange={e => setProfile(p => ({ ...p, goal: e.target.value as any }))} className={`w-full rounded-lg p-2 border ${inputClasses}`}><option value="lose_weight">Lose Weight</option><option value="maintain">Maintain</option><option value="gain_muscle">Gain Muscle</option></select></div>
-                </div>
-            </section>
-            
-            {/* Targets */}
-            <section>
-                <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold text-[var(--text-primary)]">Daily Nutritional Targets</h3>
-                    <button onClick={calculateAITargets} disabled={loading === 'calculating'} className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-medium text-white disabled:bg-zinc-600 flex items-center gap-2">
-                        {loading === 'calculating' ? <Spinner /> : '🤖 AI Calculate'}
-                    </button>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Calories</label><input type="number" value={profile.dailyTargets.calories} onChange={(e) => handleTargetChange('calories', Number(e.target.value))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Protein (g)</label><input type="number" value={profile.dailyTargets.protein} onChange={(e) => handleTargetChange('protein', Number(e.target.value))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
-                    <div><label className="block text-sm text-[var(--text-secondary)] mb-1">Fat (g)</label><input type="number" value={profile.dailyTargets.fat} onChange={(e) => handleTargetChange('fat', Number(e.target.value))} className={`w-full rounded-lg p-2 border ${inputClasses}`} /></div>
-                </div>
-                {profile.dailyTargets.isCustom && (
-                    <button onClick={validateGoalAdjustment} disabled={loading === 'validating'} className="w-full mt-3 py-2 bg-yellow-600 hover:bg-yellow-500 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2">
-                        {loading === 'validating' ? <Spinner /> : 'Get AI Feedback on These Targets'}
-                    </button>
-                )}
-                {aiFeedback && <p className={`text-xs mt-2 p-2 rounded-md ${isLight ? 'bg-rose-50 text-rose-600' : 'bg-white/5 text-zinc-400'}`}>{aiFeedback}</p>}
-            </section>
-            
-            {/* Health Conditions */}
-            <section>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-3">Health Conditions</h3>
-                <input type="file" ref={reportFileInputRef} onChange={handleReportUpload} accept="image/*,application/pdf" className="hidden" />
-                <button onClick={() => { reportFileInputRef.current?.click(); triggerHapticFeedback(); }} disabled={isAnalyzingReport} className="w-full mb-4 py-2.5 bg-green-700 hover:bg-green-600 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2 disabled:bg-zinc-600">
-                    {isAnalyzingReport ? <Spinner /> : '📄 Upload & Analyze Health Report'}
-                </button>
-                {isAnalyzingReport && <p className="text-center text-[var(--text-secondary)] text-sm my-2">Analyzing report... This may take a moment.</p>}
-                {reportAnalysis && (
-                    <div className={`p-3 rounded-lg mb-4 animate-slideUp ${isLight ? 'bg-rose-50' : 'bg-white/5'}`}>
-                        <h4 className={`font-semibold text-sm mb-1 ${isLight ? 'text-green-700' : 'text-green-400'}`}>AI Report Summary</h4>
-                        <p className="text-xs text-[var(--text-secondary)] whitespace-pre-line">{reportAnalysis.summary}</p>
-                    </div>
-                )}
-                <div className="space-y-2 mb-3">
-                    {profile.healthConditions.map((condition) => (
-                        <div key={condition} className={`flex items-center justify-between rounded-lg p-2 pl-3 text-sm ${conditionTagClasses}`}>
-                            <span>{condition}</span>
-                            <button onClick={() => handleRemoveCondition(condition)} className="text-red-400 hover:text-red-300 p-1">&times;</button>
-                        </div>
-                    ))}
-                </div>
-                <div className="flex gap-2">
-                    <input type="text" value={newCondition} onChange={e => setNewCondition(e.target.value)} placeholder="e.g., Diabetes, High BP" onKeyPress={e => e.key === 'Enter' && handleAddCondition()} className={`flex-1 w-full rounded-lg p-2 border ${inputClasses}`}/>
-                    <button onClick={handleAddCondition} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium text-white">Add</button>
-                </div>
-            </section>
-
-            {/* UI Issue Screenshots */}
-            <section>
-                <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-3">📸 UI Issue Screenshots</h3>
-                <p className="text-xs text-[var(--text-secondary)] mb-3">Upload screenshots of any UI issues you encounter. These will be saved and can be reviewed to fix bugs.</p>
-                <input type="file" ref={screenshotFileInputRef} onChange={handleScreenshotUpload} accept="image/*" multiple className="hidden" />
-                <button
-                    onClick={() => { screenshotFileInputRef.current?.click(); triggerHapticFeedback(); }}
-                    className="w-full mb-4 py-2.5 bg-cyan-700 hover:bg-cyan-600 rounded-lg text-sm font-medium text-white flex items-center justify-center gap-2"
-                >
-                    📷 Upload Screenshots
-                </button>
-
-                {uiScreenshots.length > 0 && (
-                    <div className="space-y-3">
-                        {uiScreenshots.map((screenshot) => (
-                            <div key={screenshot.id} className={`rounded-lg overflow-hidden border ${isLight ? 'border-rose-200 bg-rose-50' : 'border-zinc-700 bg-zinc-800/50'}`}>
-                                <div className="p-2 flex items-center justify-between">
-                                    <span className="text-xs text-[var(--text-secondary)]">
-                                        {new Date(screenshot.timestamp).toLocaleString()}
-                                    </span>
-                                    <button
-                                        onClick={() => handleDeleteScreenshot(screenshot.id)}
-                                        className="text-red-400 hover:text-red-300 px-2 py-1 rounded text-sm"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                                <img
-                                    src={screenshot.dataUrl}
-                                    alt="UI Issue Screenshot"
-                                    className="w-full h-auto"
-                                />
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                {uiScreenshots.length === 0 && (
-                    <div className={`text-center py-8 rounded-lg border-2 border-dashed ${isLight ? 'border-rose-200 bg-rose-50/50' : 'border-zinc-700 bg-zinc-800/30'}`}>
-                        <p className="text-sm text-[var(--text-secondary)]">No screenshots uploaded yet</p>
-                    </div>
-                )}
-            </section>
+      {/* Main Content */}
+      <div className="relative z-10 w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center p-4 pb-2">
+          <div onClick={onClose} className="flex size-12 shrink-0 items-center justify-start cursor-pointer text-white hover:text-white/80">
+            <CloseIcon className="w-6 h-6" />
+          </div>
+          <h1 className="flex-1 text-center text-lg font-bold text-white">Edit Profile</h1>
+          <div className="flex w-12 items-center justify-end"></div>
         </div>
-        <footer className="p-4 border-t border-[var(--glass-border)]">
-          <button onClick={handleSaveClick} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-white text-lg">Save Profile</button>
-        </footer>
+
+        {/* Avatar Section */}
+        <div className="flex w-full flex-col items-center gap-4 p-4">
+          <div className="flex flex-col items-center gap-4">
+            <div className="bg-cover bg-center bg-no-repeat aspect-square w-32 min-h-32 rounded-full bg-zinc-700 flex items-center justify-center overflow-hidden" style={profile.aiAvatar ? { backgroundImage: `url("${profile.aiAvatar}")` } : {}}>
+              {!profile.aiAvatar && <UserIcon className="w-16 h-16 text-zinc-500" />}
+            </div>
+            <div className="flex flex-col items-center justify-center">
+              <p className="text-[22px] font-bold leading-tight text-white text-center">
+                {profile.aiNickname || profile.name || 'Your Name'}
+              </p>
+              <button
+                onClick={handleGeneratePersona}
+                disabled={isGeneratingPersona}
+                className="text-base font-normal leading-normal text-white/70 text-center hover:text-white cursor-pointer"
+              >
+                {isGeneratingPersona ? 'Generating...' : 'Change Avatar'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 space-y-4 px-2 overflow-y-auto max-h-[calc(90vh-320px)]">
+            {/* Nickname */}
+            <div className="flex w-full flex-wrap items-end">
+              <label className="flex flex-1 flex-col min-w-40">
+                <p className="pb-2 text-base font-medium leading-normal text-white">Nickname</p>
+                <input
+                  type="text"
+                  value={profile.name || ''}
+                  onChange={e => setProfile(p => ({ ...p, name: e.target.value }))}
+                  className="flex h-14 min-w-0 flex-1 resize-none overflow-hidden rounded-xl border-none p-[15px] text-base font-normal leading-normal text-white placeholder:text-white/50 focus:outline-0 focus:ring-2 focus:ring-primary/50"
+                  style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }}
+                  placeholder="Your Name"
+                />
+              </label>
+            </div>
+
+            {/* Personal Info Accordion */}
+            <div className="flex flex-col gap-3">
+              <details className="group flex flex-col rounded-xl px-[15px] py-[7px]" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }} open>
+                <summary className="flex cursor-pointer items-center justify-between gap-6 py-2 list-none">
+                  <p className="text-sm font-medium leading-normal text-white">Personal Info</p>
+                  <svg className="w-6 h-6 text-white transition-transform duration-300 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="grid grid-cols-2 gap-4 pb-4 pt-2">
+                  <label className="flex flex-col">
+                    <p className="pb-2 text-xs font-medium leading-normal text-white/80">Age</p>
+                    <input type="number" value={profile.age} onChange={e => setProfile(p => ({ ...p, age: Number(e.target.value) }))} className="h-12 w-full rounded-lg border-none p-3 text-sm text-white placeholder:text-white/50 focus:outline-0 focus:ring-2 focus:ring-primary/50" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }} />
+                  </label>
+                  <label className="flex flex-col">
+                    <p className="pb-2 text-xs font-medium leading-normal text-white/80">Gender</p>
+                    <select value={profile.gender} onChange={e => setProfile(p => ({ ...p, gender: e.target.value as any }))} className="h-12 w-full rounded-lg border-none p-3 text-sm text-white placeholder:text-white/50 focus:outline-0 focus:ring-2 focus:ring-primary/50" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col">
+                    <p className="pb-2 text-xs font-medium leading-normal text-white/80">Height (cm)</p>
+                    <input type="number" value={profile.height} onChange={e => setProfile(p => ({ ...p, height: Number(e.target.value) }))} className="h-12 w-full rounded-lg border-none p-3 text-sm text-white placeholder:text-white/50 focus:outline-0 focus:ring-2 focus:ring-primary/50" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }} />
+                  </label>
+                  <label className="flex flex-col">
+                    <p className="pb-2 text-xs font-medium leading-normal text-white/80">Weight (kg)</p>
+                    <input type="number" value={profile.weight} onChange={e => setProfile(p => ({ ...p, weight: Number(e.target.value) }))} className="h-12 w-full rounded-lg border-none p-3 text-sm text-white placeholder:text-white/50 focus:outline-0 focus:ring-2 focus:ring-primary/50" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }} />
+                  </label>
+                  <label className="flex flex-col">
+                    <p className="pb-2 text-xs font-medium leading-normal text-white/80">Activity Level</p>
+                    <select value={profile.activityLevel} onChange={e => setProfile(p => ({ ...p, activityLevel: e.target.value as any }))} className="h-12 w-full rounded-lg border-none p-3 text-sm text-white placeholder:text-white/50 focus:outline-0 focus:ring-2 focus:ring-primary/50" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+                      <option value="sedentary">Sedentary</option>
+                      <option value="light">Light</option>
+                      <option value="moderate">Moderate</option>
+                      <option value="active">Active</option>
+                      <option value="very_active">Very Active</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col">
+                    <p className="pb-2 text-xs font-medium leading-normal text-white/80">Goal</p>
+                    <select value={profile.goal} onChange={e => setProfile(p => ({ ...p, goal: e.target.value as any }))} className="h-12 w-full rounded-lg border-none p-3 text-sm text-white placeholder:text-white/50 focus:outline-0 focus:ring-2 focus:ring-primary/50" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+                      <option value="lose_weight">Lose Weight</option>
+                      <option value="maintain">Maintain</option>
+                      <option value="gain_muscle">Gain Muscle</option>
+                    </select>
+                  </label>
+                </div>
+              </details>
+            {/* Daily Targets Accordion */}
+              <details className="group flex flex-col rounded-xl px-[15px] py-[7px]" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+                <summary className="flex cursor-pointer items-center justify-between gap-6 py-2 list-none">
+                  <p className="text-sm font-medium leading-normal text-white">Daily Targets</p>
+                  <svg className="w-6 h-6 text-white transition-transform duration-300 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="space-y-4 pb-4 pt-2">
+                  <div className="flex min-h-14 items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex shrink-0 items-center justify-center rounded-lg size-10" style={{ background: 'rgba(255, 255, 255, 0.1)' }}>
+                        <span className="text-white">✨</span>
+                      </div>
+                      <p className="flex-1 truncate text-base font-normal leading-normal text-white">AI-Generated Targets</p>
+                    </div>
+                    <button onClick={calculateAITargets} disabled={loading === 'calculating'} className="px-3 py-1.5 bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90 rounded-lg text-sm font-medium text-white disabled:opacity-50 flex items-center gap-2">
+                      {loading === 'calculating' ? <Spinner /> : 'Calculate'}
+                    </button>
+                  </div>
+                  {aiFeedback && <p className="text-sm font-normal leading-normal text-white/70">{aiFeedback}</p>}
+                </div>
+              </details>
+
+              {/* Health Conditions Accordion */}
+              <details className="group flex flex-col rounded-xl px-[15px] py-[7px]" style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }}>
+                <summary className="flex cursor-pointer items-center justify-between gap-6 py-2 list-none">
+                  <p className="text-sm font-medium leading-normal text-white">Health Conditions</p>
+                  <svg className="w-6 h-6 text-white transition-transform duration-300 group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </summary>
+                <div className="pb-4 pt-2">
+                  <label className="flex flex-col">
+                    <p className="pb-2 text-xs font-medium leading-normal text-white/80">Allergies, restrictions, etc.</p>
+                    <input
+                      type="text"
+                      value={newCondition}
+                      onChange={e => setNewCondition(e.target.value)}
+                      onKeyPress={e => e.key === 'Enter' && handleAddCondition()}
+                      placeholder="e.g., Peanuts, Lactose Intolerant"
+                      className="h-12 w-full rounded-lg border-none p-3 text-sm text-white placeholder:text-white/50 focus:outline-0 focus:ring-2 focus:ring-primary/50"
+                      style={{ background: 'rgba(255, 255, 255, 0.1)', backdropFilter: 'blur(20px)', border: '1px solid rgba(255, 255, 255, 0.15)' }}
+                    />
+                  </label>
+                  {profile.healthConditions.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      {profile.healthConditions.map((condition) => (
+                        <div key={condition} className="flex items-center justify-between rounded-lg p-2 pl-3 text-sm bg-white/5 text-white">
+                          <span>{condition}</span>
+                          <button onClick={() => handleRemoveCondition(condition)} className="text-red-400 hover:text-red-300 p-1">&times;</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </details>
+        </div>
+
+        {/* Sticky Bottom Buttons */}
+        <div className="sticky bottom-0 mt-auto flex w-full flex-col gap-3 bg-transparent p-4 pb-6">
+          <button
+            onClick={handleSaveClick}
+            className="flex h-14 w-full items-center justify-center rounded-xl text-base font-bold text-white"
+            style={{ backgroundImage: 'linear-gradient(to right, #00c6ff, #0072ff)' }}
+          >
+            Save Changes
+          </button>
+          <button
+            onClick={onClose}
+            className="flex h-14 w-full items-center justify-center rounded-xl text-base font-bold text-white"
+            style={{ backgroundColor: 'transparent', border: '1px solid rgba(255, 255, 255, 0.3)' }}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     </div>
   );
